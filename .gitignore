@@ -1,0 +1,4 @@
+# MacBridge bootstrap logs — keep directory, ignore contents
+logs/*.log
+logs/*
+!logs/.gitkeep
