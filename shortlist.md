@@ -124,8 +124,22 @@ is now the self-contained product surface — embedded tooling, `install`, local
 template — and **`macbridge install` reached 🟢 MAC READY on a real Apple-hardware runner**
 under a strict (no error-swallowing) CI gate.
 
-**Distance to first dollar is now operational, not code:**
-1. Create the Homebrew tap repo + cut a `v0.1.0` tag (release workflow does the rest).
-2. LemonSqueezy checkout → deliver an `mbkeygen` key on purchase.
-3. Apple Developer ID signing/notarization for direct downloads (Homebrew works without).
-4. Decide the S7 tier structure; when you have a GUI Mac, `golden-image.sh build` → snapshot.
+**v0.1.0 SHIPPED (2026-07-01, `HISTORY.md` Act XX):** public tap
+(`brew tap maverick-lab-maintaner/tap && brew install macbridge`), tagged release with
+darwin arm64/amd64 + windows artifacts and checksums, formula carries real sha256s,
+verified three ways (release binary runs; strict smoke **on the tag** → 🟢 MAC READY;
+checksums match). Five beta keys generated.
+
+**Queued next (deliberately parked until the product is user-tested):**
+
+- [ ] **P1a — LemonSqueezy checkout + key delivery.** Wire a LemonSqueezy product for
+  Studio ($19/mo); on purchase webhook → generate a key (mbkeygen logic) → deliver in the
+  purchase email. LemonSqueezy's merchant dashboard covers customers/payments/refunds —
+  build no admin UI. This is the piece that converts Radar leads to revenue with zero
+  frontend. **Do after the first real-Mac UX test validates the experience.**
+- [ ] **UX test on a real Mac (the $15 Macly day).** The real customer path end-to-end:
+  `brew install` from the tap → `macbridge install` → `workspace-setup.sh` login studio →
+  `golden-image.sh build` → provider snapshot (finishes S2). This one rental validates the
+  imagined first-login experience *and* produces the golden image.
+- [ ] Apple Developer ID signing/notarization for direct downloads (Homebrew works without).
+- [ ] Decide the S7 tier structure (business).
