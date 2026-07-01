@@ -103,6 +103,21 @@ locally (AST parser, mocked contracts, `--dry-run`) but **not yet run on a real 
 | S5 | Usage instrumentation | A running beta Mac to measure (`healthd` already emits usage events to build on). |
 | S6 | Conversion measurement | Real beta users. |
 
-**Next real-world move: S1 (Apple ToS)** — cheapest, and it gates everything commercial.
-When you have a Mac provisioned, the live `golden-image.sh build` → snapshot flow is the
-one that turns the S2 tooling into an actual image.
+**Update (2026-07-01, post software-first):** S1 is done and repriced (S7 →
+`docs/BUSINESS_MODELS.md`: ship **Studio** first). That reframing also reprioritizes the
+leftovers: **S3 (provider-agnosticism)** is now *more* valuable (Studio must run identically
+on any Mac), while **W5 (provider API)** is deferred to the Managed tier.
+
+**The "never run on a real Mac" caveat is retired.** The `macos-smoke.yml` workflow ran
+everything on real GitHub `macos-latest` runners: the read-only suite emitted valid
+contracts (correctly diagnosing a bare runner as `blocked`), and after fixing three real
+bugs the run found (`declare -A` is bash 4+ but macOS ships 3.2; `| head -1` +
+`pipefail` = SIGPIPE false-FAILs; hyphenated smoke-test dir is an invalid Dart package
+name), **the full `bootstrap --from 2` → verify → `flutter build ios` path produced the
+first 🟢 MAC READY in the project's history** (run 28546747490, $0). See `HISTORY.md`
+Act XVIII. Still untested on a real Mac: `workspace-setup.sh` login behaviour and
+`provision.ps1` against a live host (both need GUI/SSH, not CI).
+
+**Next moves:** decide the S7 tier structure (business), then Studio packaging P0
+(`docs/STUDIO_PACKAGING.md`). When you have a Mac with GUI access, `golden-image.sh build`
+→ snapshot turns the S2 tooling into an actual image.

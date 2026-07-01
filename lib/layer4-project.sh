@@ -41,15 +41,23 @@ echo ""
 
 # ── 1. Create test Flutter project ────────────────────────────────────────
 step "Creating test Flutter project..."
-TEST_DIR="/tmp/macbridge-smoke-test-$$"
+# Underscores, not hyphens: flutter create uses the directory name as the Dart
+# package name, and hyphens are invalid ("macbridge-smoke-test-123" is rejected).
+# Found live on the macOS runner — the smoke test could never pass with a hyphen.
+TEST_DIR="/tmp/macbridge_smoke_test_$$"
 
 # Clean up any previous test
 rm -rf "$TEST_DIR" 2>/dev/null || true
 
-if flutter create --org com.macbridge "$TEST_DIR" > /dev/null 2>&1; then
+CREATE_OUTPUT=$(flutter create --org com.macbridge "$TEST_DIR" 2>&1) || CREATE_FAILED=true
+
+if [ "${CREATE_FAILED:-false}" = false ]; then
     ok "Flutter project created: $TEST_DIR"
 else
     fail "Failed to create Flutter test project — Flutter SDK may be broken"
+    echo ""
+    echo -e "  ${YELLOW}flutter create output (last 20 lines):${NC}"
+    echo "$CREATE_OUTPUT" | tail -20
     exit 1
 fi
 
