@@ -7,6 +7,7 @@
 - [Business Models](./BUSINESS_MODELS.md) - the four models compared and the software-first (Studio) decision
 - [Personas](./PERSONAS.md) - the three target personas re-read through the software-first split ("do they already have a Mac?")
 - [Studio Packaging](./STUDIO_PACKAGING.md) - the build path to ship the software product (CLI install, licensing, updates)
+- [Release Checklist](./RELEASE_CHECKLIST.md) - the 10-minute runbook: Homebrew tap setup, cutting v0.1.0, verification, beta key onboarding
 - [Go-to-Market](./GO_TO_MARKET.md) - how Radar finds customers and the funnel into the compliant tiers
 - [Local Testing](./LOCAL_TESTING.md) - validate on WSL + free GitHub Actions macOS runners before renting a Mac
 - [Website and Dashboard Spec](./WEBSITE_DASHBOARD_SPEC.md) - what the site and first customer control plane must clarify now
