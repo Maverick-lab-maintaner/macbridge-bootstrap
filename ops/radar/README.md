@@ -189,6 +189,45 @@ Phase 3 now adds:
 The board is still read-only on purpose.
 Review actions remain explicit CLI commands.
 
+### Phase 4 (planned): Agent-Reach collection backend
+
+Today `sources.py` only collects from three inputs: manual JSON files,
+RSS feeds, and a single Hacker News-style search scraper. That is the thin
+part of the module.
+
+[Agent-Reach](https://github.com/Panniantong/Agent-Reach) is a read/search-only
+capability layer that gives an agent access across X/Twitter, Reddit, GitHub,
+YouTube, RSS, and more, with ordered backends and automatic fallback. It maps
+directly onto the collection stage of this pipeline:
+
+```text
+Agent-Reach            MacBridge Radar
+COLLECT  ───────────►  CLASSIFY → SCORE → DRAFT → REVIEW → BOARD
+```
+
+The seam is `sources.py`. A future adapter — registered alongside the existing
+manual / RSS / HN loaders in `radar.py run_scan` — would look like:
+
+```python
+def load_agent_reach_searches(queries, limit) -> list[RawLead]:
+    # subprocess: agent-reach search <platform> "<query>" --json
+    # map results -> RawLead(platform, author, url, title, text, captured_at)
+```
+
+Design constraints, so the module stays honest:
+
+- **Gate it behind a `--agent-reach` flag.** Radar must still run zero-dependency
+  by default (mirrors the vanilla/agent tier split in bootstrap). Agent-Reach is
+  an extra runtime dependency plus per-platform auth (e.g. X cookies).
+- **Wrap every call like `fetch_feed_safe`.** A broken backend should degrade to
+  "no leads from that platform," never crash the scan. Pin an Agent-Reach version.
+- **The safety boundary is preserved.** Agent-Reach does not post, and Radar does
+  not auto-post. Collection stays read-only; `review.py` remains the only path to
+  outbound. Neither half can spam.
+
+This is a documented seam, not yet implemented. Do not add the dependency until
+Agent-Reach is confirmed installed on the target machines.
+
 ## HTML Board
 
 Generate a local review board:

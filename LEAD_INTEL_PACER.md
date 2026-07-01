@@ -582,6 +582,28 @@ What I would build first if we start:
 - outcome tracking
 - learning loop
 
+### Phase 4
+
+- swap the hand-rolled collectors in `ops/radar/sources.py` for
+  [Agent-Reach](https://github.com/Panniantong/Agent-Reach) as the collection
+  backend
+
+Agent-Reach is the concrete realization of the "eyes" half of this document.
+It is a read/search-only capability layer with ordered backends, automatic
+fallback, and an `agent-reach doctor` health command — the same
+probe-and-degrade philosophy MacBridge already uses in `doctor.sh` and the
+status contract. It reads and searches across X, Reddit, GitHub, YouTube, and
+RSS, and deliberately **does not post**.
+
+That boundary is why the pairing is safe: Agent-Reach cannot post, and Radar
+does not auto-post. Collection stays read-only; human approval in the review
+queue remains the only path to outbound.
+
+The integration seam is `sources.py` (see `ops/radar/README.md` → Phase 4 for
+the adapter shape and constraints). Gate it behind a `--agent-reach` flag so
+Radar keeps running zero-dependency by default, and do not add the dependency
+until Agent-Reach is confirmed installed on the target machines.
+
 ---
 
 ## Bottom Line
