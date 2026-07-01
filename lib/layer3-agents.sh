@@ -16,7 +16,6 @@
 set -euo pipefail
 
 LAYER="Layer 3"
-LOG_FILE="${MACBRIDGE_LOG_DIR:-logs}/layer3-agents.log"
 
 # Source shared utilities
 if [ -f "${MACBRIDGE_LIB_DIR:-lib}/_utils.sh" ]; then
@@ -65,14 +64,6 @@ else
     step "Installing Node.js 22 via Homebrew..."
     brew install node@22 2>/dev/null || brew install node 2>/dev/null || true
 
-    # Ensure npm global bin is in PATH
-    NPM_GLOBAL_BIN=""
-    if [ -d "/opt/homebrew/lib/node_modules/npm/bin" ]; then
-        NPM_GLOBAL_BIN="/opt/homebrew/lib/node_modules/npm/bin"
-    elif [ -d "/usr/local/lib/node_modules/npm/bin" ]; then
-        NPM_GLOBAL_BIN="/usr/local/lib/node_modules/npm/bin"
-    fi
-
     if command -v node > /dev/null 2>&1; then
         ok "Node.js installed: $(node --version)"
     else
@@ -96,17 +87,14 @@ fi
 # ── 2. Install/Verify Claude Code ─────────────────────────────────────────
 step "Checking Claude Code..."
 
-CLAUDE_INSTALLED=false
 if command -v claude > /dev/null 2>&1; then
     ok "Claude Code installed: $(claude --version 2>/dev/null || echo 'version unknown')"
-    CLAUDE_INSTALLED=true
 else
     step "Installing Claude Code..."
     npm install -g @anthropic-ai/claude-code 2>/dev/null || true
 
     if command -v claude > /dev/null 2>&1; then
         ok "Claude Code installed"
-        CLAUDE_INSTALLED=true
     else
         warn "Claude Code installation via npm failed"
         warn "  Manual install: npm install -g @anthropic-ai/claude-code"

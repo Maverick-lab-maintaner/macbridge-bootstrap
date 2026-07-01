@@ -76,13 +76,12 @@ All implemented and validated locally (PowerShell AST parser for the `.ps1`; moc
 
 ## D. Tech-debt follow-ups (surfaced by CI, not blocking deploy)
 
-- [ ] **SH1 — ShellCheck warning cleanup.** The gate now runs at `severity: error`
-  (real bugs block; style warnings advisory) after a genuine parse-error bug in
-  `install-skills.sh` was fixed. ~15 `SC2034` "unused variable" warnings remain across
-  the layer/ops scripts — mostly the fallback-helper duplication from the P1 audit
-  finding (`LOG_FILE`, `PASS`, `FAIL`, etc. defined in each script's standalone-fallback
-  block). Proper fix = dedupe the fallback helpers so those vars aren't redundantly
-  declared; then the gate can go back to `severity: warning`.
+- [x] **SH1 — ShellCheck warning cleanup.** Done. Removed dead vars (`LOG_FILE` in
+  layers 0–3, `NPM_GLOBAL_BIN` + `CLAUDE_INSTALLED` superseded/unused in layer3,
+  `PF_ANCHOR`, `LIB_DIR`, `SKIP`, `RED`, and hardening's redundant `PASS/FAIL` re-init
+  that `_utils.sh` already provides), and annotated the one `SC2207` in `migrate.sh`
+  with a reason (kept the portable `IFS`/`()` form — `mapfile` is bash 4+, but macOS
+  ships bash 3.2). Gate restored to `severity: warning`.
 
 ---
 

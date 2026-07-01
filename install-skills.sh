@@ -20,7 +20,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_DIR="$HOME/.agents/skills"
 TIER="agent"
 SOURCE_DIR=""

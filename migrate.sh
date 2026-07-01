@@ -27,7 +27,7 @@ export MACBRIDGE_LOG_DIR="${SCRIPT_DIR}/logs"
 
 [ -f "${LIB_DIR}/_utils.sh" ] && source "${LIB_DIR}/_utils.sh"
 
-GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
 VERSION_FILE="/etc/macbridge-version"
@@ -70,6 +70,7 @@ list_versions() {
         versions+=("$ver")
     done
 
+    # shellcheck disable=SC2207  # portable to macOS bash 3.2; mapfile is bash 4+
     IFS=$'\n' versions=($(printf '%s\n' "${versions[@]}" | perl -e 'print sort {
         my ($an) = $a =~ /(\d+)/;
         my ($bn) = $b =~ /(\d+)/;
