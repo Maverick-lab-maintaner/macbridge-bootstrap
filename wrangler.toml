@@ -1,0 +1,15 @@
+name = "macbridge-health"
+main = "dashboard/health-receiver.js"
+compatibility_date = "2026-07-01"
+
+# Cloudflare KV for fleet state storage
+# Create these in Cloudflare dashboard or via:
+#   npx wrangler kv:namespace create MACBRIDGE_FLEET
+# Then paste the IDs below:
+
+# kv_namespaces = [
+#   { binding = "MACBRIDGE_FLEET", id = "YOUR_KV_NAMESPACE_ID" }
+# ]
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
