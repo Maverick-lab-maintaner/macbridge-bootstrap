@@ -103,11 +103,11 @@ Or turn on the live source connector:
 ```powershell
 python ops/radar/radar.py scan `
   --manual ops/radar/sample/manual_leads.json `
-  --hn `
-  --hn-limit 1
+  --reddit `
+  --reddit-limit 1
 ```
 
-The `--hn` flag is the historical CLI name. It now means "include the live Reddit search RSS connector."
+`--reddit` includes the live Reddit search RSS connector.
 The live edge is best-effort and may be rate-limited by Reddit, but the scan keeps going and still writes the queue.
 
 ## Outputs
@@ -192,7 +192,7 @@ Review actions remain explicit CLI commands.
 ### Phase 4 (planned): Agent-Reach collection backend
 
 Today `sources.py` only collects from three inputs: manual JSON files,
-RSS feeds, and a single Hacker News-style search scraper. That is the thin
+RSS feeds, and a single Reddit search RSS connector. That is the thin
 part of the module.
 
 [Agent-Reach](https://github.com/Panniantong/Agent-Reach) is a read/search-only
@@ -206,7 +206,7 @@ COLLECT  ───────────►  CLASSIFY → SCORE → DRAFT → 
 ```
 
 The seam is `sources.py`. A future adapter — registered alongside the existing
-manual / RSS / HN loaders in `radar.py run_scan` — would look like:
+manual / RSS / Reddit loaders in `radar.py run_scan` — would look like:
 
 ```python
 def load_agent_reach_searches(queries, limit) -> list[RawLead]:

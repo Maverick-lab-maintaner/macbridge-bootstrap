@@ -9,7 +9,7 @@ from board import write_board
 from engine import build_lead_items, load_queries, write_outputs
 from models import QueueFile, export_approved, load_queue, save_queue
 from review import list_queue, update_queue_status
-from sources import load_feeds, load_hackernews_searches, load_manual_files
+from sources import load_feeds, load_reddit_searches, load_manual_files
 
 
 ROOT = Path(__file__).resolve().parent
@@ -25,8 +25,8 @@ def parse_args() -> argparse.Namespace:
     scan.add_argument("--manual", nargs="*", default=[], help="Manual JSON lead files")
     scan.add_argument("--feeds", default="", help="Optional feeds.txt path")
     scan.add_argument("--queries", default=str(DEFAULT_QUERIES), help="Path to queries.json")
-    scan.add_argument("--hn", action="store_true", help="Include live Hacker News search results")
-    scan.add_argument("--hn-limit", type=int, default=5, help="Max Hacker News results per query")
+    scan.add_argument("--reddit", action="store_true", help="Include live Reddit search RSS results")
+    scan.add_argument("--reddit-limit", type=int, default=5, help="Max Reddit results per query")
     scan.add_argument("--out", default=str(DEFAULT_OUTPUT), help="Output directory")
 
     review = subparsers.add_parser("review", help="Review and update queue state")
@@ -44,13 +44,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_scan(manual: list[str], feeds: str, queries_path: str, out_path: str, hn: bool = False, hn_limit: int = 5) -> int:
+def run_scan(manual: list[str], feeds: str, queries_path: str, out_path: str, reddit: bool = False, reddit_limit: int = 5) -> int:
     queries = load_queries(Path(queries_path))
     raw_items = load_manual_files([Path(path) for path in manual])
     if feeds:
         raw_items.extend(load_feeds(Path(feeds)))
-    if hn:
-        raw_items.extend(load_hackernews_searches(queries, hn_limit))
+    if reddit:
+        raw_items.extend(load_reddit_searches(queries, reddit_limit))
     if not raw_items:
         print("No lead items loaded. Provide --manual and/or --feeds.", file=sys.stderr)
         return 1
@@ -98,7 +98,7 @@ def main() -> int:
     args = parse_args()
     match args.command:
         case "scan":
-            return run_scan(args.manual, args.feeds, args.queries, args.out, args.hn, args.hn_limit)
+            return run_scan(args.manual, args.feeds, args.queries, args.out, args.reddit, args.reddit_limit)
         case "review":
             return run_review(load_queue(Path(args.queue)), Path(args.queue), args.approve, args.reject, args.note, args.list, args.export_approved)
         case "board":
