@@ -35,9 +35,13 @@ Legend: `[ ]` open · `[x]` done · `[~]` deferred (needs API/scale work) · `[!
 
 - [!] **S1 — Apple ToS due diligence (30 min).** Marked ❌ *Not done* in
   `HONEST_ASSESSMENT.md`. Existential risk, cheap to check. **Do before charging anyone.**
-- [!] **S2 — Build + snapshot the golden image**, including the auto-arranged workspace
-  (Terminal open, Simulator booted, Wizard running). This is where the "excellent UX"
-  actually lives and what makes the "0 minutes" claim true. Requires a Mac + GUI once.
+- [~] **S2 — Golden image + auto-arranged workspace.** Tooling built:
+  `readiness.sh` (the "🟢 MacBridge Ready" screen rendered from the status contract),
+  `workspace-setup.sh` (LaunchAgent opens Terminal + boots the Simulator on login; a
+  `~/.zprofile` hook greets every login shell with the readiness screen), and
+  `golden-image.sh` (build → verify → workspace → version manifest → snapshot guidance,
+  plus a `verify` drift-check). **Still manual:** the one-time Xcode GUI install and the
+  provider snapshot itself — inherent, needs a real Mac + provider console.
 - [!] **S3 — Test provider abstraction** — confirm `bootstrap.sh` runs identically on
   Macly AND VPSMAC without modification.
 - [x] **S4 — Code-signing diagnoser.** The #1 user pain after setup. Implemented as
@@ -65,7 +69,7 @@ All implemented and validated locally (PowerShell AST parser for the `.ps1`; moc
 |----|------|-------------------------|
 | W5 | Provider API provisioning | Needs a chosen provider (Macly/VPSMAC) + API keys. Phase 1. |
 | S1 | Apple ToS due diligence | 30-min human research task. **Gates charging anyone.** |
-| S2 | Golden image + auto-arranged workspace | Needs a Mac + one-time GUI session. This is where the UX lives. |
+| S2 | Golden image **snapshot** (tooling now done) | Only the one-time Xcode GUI install + provider snapshot remain — needs a real Mac + provider console. |
 | S3 | Provider abstraction test | Needs accounts on two providers. |
 | S5 | Usage instrumentation | Needs a running beta Mac to measure; `healthd` already emits usage events to build on. |
 | S6 | Conversion measurement | Needs real beta users. |

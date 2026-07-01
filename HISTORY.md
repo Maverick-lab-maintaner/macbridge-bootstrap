@@ -1874,4 +1874,70 @@ This act adds two lessons, both about trusting the right source of truth:
 
 ---
 
+## Act XII: The Golden Image — Codifying the "Prepared Studio" the Product Sells
+
+**Context:** The audit (Act XI) named the golden image as the single most important unbuilt piece: it is where the "0 minutes to a working Mac" promise and the "excellent UX" both live. But a golden image is partly un-codeable — installing Xcode needs a GUI session, and snapshotting needs a provider console. This act built everything *around* those two manual steps so the image is reproducible and the studio experience is real.
+
+### What "the golden image" actually decomposes into
+
+Reading the KnowledgeBase (`MVP_BUILD_PLAN.md` §6, `ONBOARDING_ENVIRONMENT_STRATEGY.md`) made the split clear:
+
+- **Manual, once:** install Xcode via the App Store (GUI), then take a provider snapshot. Un-codeable by nature.
+- **Codeable:** everything that makes the image *reproducible* (a version manifest, a verify gate) and everything that makes first login feel like a *prepared studio* (auto-opened Terminal + Simulator, a readiness screen instead of a bare prompt).
+
+So the deliverable was three scripts around the two manual steps, not an attempt to fake them.
+
+### What was built
+
+- **`readiness.sh`** — renders the "🟢 MacBridge Ready" screen from the *same status contract* as `verify.sh`/`doctor.sh`. A green checklist (Flutter/Xcode/Simulator/CocoaPods/Ruby/Node/agents) with the machine state; yellow/red variants point at `doctor.sh`. This is the psychological promise from `HONEST_ASSESSMENT.md`, now driven by real data rather than a hardcoded banner.
+- **`workspace-setup.sh`** — the "prepared studio." A LaunchAgent (`app.macbridge.workspace`) opens Terminal and boots a Simulator device on GUI login; a guarded `~/.zprofile` hook shows the readiness screen once per login shell (Terminal or SSH). Idempotent, `--dry-run`, `--uninstall`, device resolved at login time so it survives image rebuilds.
+- **`golden-image.sh`** — the Stage 1 orchestrator: `build` runs bootstrap → gates on `verify.sh` reporting `ready` → arranges the workspace → writes `/etc/macbridge-manifest.json` (exact versions) → tags `/etc/macbridge-version` via `migrate.sh` → prints provider-specific snapshot guidance. `manifest` emits the version JSON; `verify` drift-checks a live machine against a saved manifest.
+
+The design deliberately reuses what already existed: the status contract (so readiness and the build gate speak the same JSON as the fleet tools) and `migrate.sh`'s version file (so the manifest and the version registry stay coherent).
+
+### The same bug, twice — heredoc vs. stdin
+
+Both `readiness.sh` and `golden-image.sh verify` needed to feed JSON to an inline Python renderer. The first attempt in each used the shape:
+
+```bash
+printf '%s' "$JSON" | python3 - <<'PY'
+    report = json.load(sys.stdin)
+```
+
+This silently fails: the `<<'PY'` heredoc *is* Python's stdin (it carries the program), so the piped JSON never arrives — `json.load(sys.stdin)` reads the program text or EOF and errors with "Expecting value: line 1 column 1". The fix, both times, was to pass the JSON as an **argv** instead and keep the heredoc purely for the program (the pattern `doctor.sh` already used):
+
+```bash
+python3 - "$JSON" <<'PY'
+    report = json.loads(sys.argv[1])
+```
+
+Hitting the identical bug in two scripts in one sitting is the lesson: when a pattern is subtly wrong, it will be copy-pasted before it is understood. The tell was consistent — an empty-stdin JSON error — and the fix was mechanical once named.
+
+### Windows-testing artifacts (not target bugs)
+
+Developing on Windows against macOS scripts surfaced two non-bugs worth recording so they are not mistaken for defects later:
+
+- Windows Python's stdout is cp1252 and cannot encode the box-drawing/emoji glyphs in the readiness screen. Guarded with `sys.stdout.reconfigure(encoding="utf-8")` — a no-op on macOS, robust everywhere.
+- The drift check showed a false `flutter` DRIFT locally because the `•` bullet round-tripped through cp1252 differently on the saved vs. live side. On macOS (UTF-8 throughout) the two match. The real signal — a changed `node` version — was detected correctly.
+
+### Exact toolchain used in this pass
+
+- `python3` heredocs for JSON rendering (readiness screen, drift table), with UTF-8 stdout reconfiguration
+- `launchctl` + a LaunchAgent plist for login-time app launching; `xcrun simctl` for Simulator boot; a `~/.zprofile` hook for login-shell greeting
+- `sw_vers`, `xcodebuild -version`, `xcrun simctl list runtimes`, `flutter/pod/ruby/node --version` for manifest capture; `json_string` (perl) from `_utils.sh` for safe JSON emission
+- verification: `bash -n` on all three scripts; mocked status contracts (ready + degraded) for `readiness.sh`; `--dry-run` for `workspace-setup.sh`; live `manifest` + a synthesized drift for `golden-image.sh verify`
+
+### What this changed
+
+Before: the golden image was a plan in the KnowledgeBase and a version string in `migrate.sh`. The "prepared studio" and the readiness screen were mockups in a doc.
+
+After: the studio and the readiness screen are scripts; the image is reproducible (manifest + verify gate) and its drift is detectable; and the two genuinely-manual steps (Xcode GUI install, provider snapshot) are the *only* manual steps, each guided by `golden-image.sh build`.
+
+### The operational lesson
+
+> Some of the product is un-codeable — but the code can shrink the manual part to exactly its irreducible core and make everything around it reproducible and verifiable.
+> The golden image still needs a human to install Xcode once and click "snapshot." Everything else — the gate, the manifest, the drift check, the studio — is now automated and testable.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
