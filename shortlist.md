@@ -70,6 +70,18 @@ All implemented and validated locally (PowerShell AST parser for the `.ps1`; moc
 | S5 | Usage instrumentation | Needs a running beta Mac to measure; `healthd` already emits usage events to build on. |
 | S6 | Conversion measurement | Needs real beta users. |
 
+## D. Tech-debt follow-ups (surfaced by CI, not blocking deploy)
+
+- [ ] **SH1 — ShellCheck warning cleanup.** The gate now runs at `severity: error`
+  (real bugs block; style warnings advisory) after a genuine parse-error bug in
+  `install-skills.sh` was fixed. ~15 `SC2034` "unused variable" warnings remain across
+  the layer/ops scripts — mostly the fallback-helper duplication from the P1 audit
+  finding (`LOG_FILE`, `PASS`, `FAIL`, etc. defined in each script's standalone-fallback
+  block). Proper fix = dedupe the fallback helpers so those vars aren't redundantly
+  declared; then the gate can go back to `severity: warning`.
+
+---
+
 **The single most important next step is S2 (golden image)** — it delivers the "excellent
 UX" and validates the "0 minutes" promise. S1 (Apple ToS) is the cheapest and must precede
 any charging. Sections A and S4 are now off your plate; everything remaining needs a real

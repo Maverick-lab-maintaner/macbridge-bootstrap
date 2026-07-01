@@ -35,7 +35,10 @@ jobs:
         with:
           scandir: '.'
           format: tty
-          severity: warning
+          # error-level: genuine bugs (parse errors, bad expansions) block the
+          # build; SC2034/SC2207-style warnings are advisory. See shortlist.md
+          # (SH1) for the tracked warning-cleanup + fallback-helper dedup.
+          severity: error
           ignore_paths: '.git .cache'
 
   syntax-check:
