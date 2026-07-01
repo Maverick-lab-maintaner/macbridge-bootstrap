@@ -7,7 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var installFromLayer int
+var (
+	installFromLayer int
+	installAgents    string
+)
 
 // installCmd is the Studio entry point: turn the Mac this command runs on
 // into a verified Flutter/iOS workspace using the embedded tooling.
@@ -24,7 +27,24 @@ Free tier. Requires macOS with Xcode installed (the one GUI prerequisite).`,
 			return err
 		}
 
+		// Agent tier: the user chooses which agents to install. The flag wins;
+		// otherwise ask interactively when there's a terminal (never in CI).
+		agents := installAgents
+		if tier == "agent" && agents == "" && stdinIsTerminal() {
+			agents = pickAgents()
+		}
+		if agents != "" {
+			if parsed, err := parseAgentSelection(agents); err != nil {
+				return err
+			} else {
+				agents = parsed
+			}
+		}
+
 		bootstrapArgs := []string{"--tier", tier}
+		if agents != "" {
+			bootstrapArgs = append(bootstrapArgs, "--agents", agents)
+		}
 		if installFromLayer > 0 {
 			bootstrapArgs = append(bootstrapArgs, "--from", strconv.Itoa(installFromLayer))
 		}
@@ -42,4 +62,5 @@ Free tier. Requires macOS with Xcode installed (the one GUI prerequisite).`,
 
 func init() {
 	installCmd.Flags().IntVar(&installFromLayer, "from", 0, "Start bootstrap from layer N (resume after a fixed failure)")
+	installCmd.Flags().StringVar(&installAgents, "agents", "", "Agents to install: claude,opencode,codex, all, or none (agent tier; interactive if omitted)")
 }

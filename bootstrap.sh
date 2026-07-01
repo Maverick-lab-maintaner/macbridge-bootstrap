@@ -69,14 +69,21 @@ while [[ $# -gt 0 ]]; do
             export MACBRIDGE_REPORT_URL="$REPORT_URL"
             shift 2
             ;;
+        --agents)
+            # Comma-separated: claude,opencode,codex (or "none"). Layer 3 only
+            # installs what's selected. Default: all three.
+            export MACBRIDGE_AGENTS="$2"
+            shift 2
+            ;;
         --help|-h)
             echo "Usage: bash bootstrap.sh [options]"
             echo ""
             echo "Options:"
-            echo "  --from N      Start from layer N (0-4)"
-            echo "  --tier TYPE   Provisioning tier: vanilla (no agents, \$19/mo) or agent (full, \$39/mo)"
+            echo "  --from N       Start from layer N (0-4)"
+            echo "  --tier TYPE    Provisioning tier: vanilla (no agents) or agent (with AI agents)"
+            echo "  --agents LIST  Which agents to install: claude,opencode,codex or none (default: all)"
             echo "  --report-to URL  Ship layer results to central endpoint (POST JSON)"
-            echo "  --help        Show this help"
+            echo "  --help         Show this help"
             exit 0
             ;;
         *)

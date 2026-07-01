@@ -33,9 +33,17 @@ fi
 
 PASS=0; FAIL=0
 
+# ── Agent selection ────────────────────────────────────────────────────────
+# The user chooses which agents to install (CLI TUI or bootstrap --agents).
+# Comma-separated list; default is all three. "none" installs no agent CLIs
+# (Node + tmux still install — they serve the whole workspace).
+AGENTS="${MACBRIDGE_AGENTS:-claude,opencode,codex}"
+wants() { case ",${AGENTS}," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
+
 echo ""
 echo -e "${BOLD}${CYAN}🤖 ${LAYER}: AI Agents${NC}"
 echo "──────────────────────────────────────────────"
+echo -e "  ${CYAN}Selected:${NC} ${AGENTS}"
 echo ""
 
 # ── Helper: ensure directory in PATH ──────────────────────────────────────
@@ -85,60 +93,71 @@ else
 fi
 
 # ── 2. Install/Verify Claude Code ─────────────────────────────────────────
-step "Checking Claude Code..."
-
-if command -v claude > /dev/null 2>&1; then
-    ok "Claude Code installed: $(claude --version 2>/dev/null || echo 'version unknown')"
-else
-    step "Installing Claude Code..."
-    npm install -g @anthropic-ai/claude-code 2>/dev/null || true
+if wants claude; then
+    step "Checking Claude Code..."
 
     if command -v claude > /dev/null 2>&1; then
-        ok "Claude Code installed"
+        ok "Claude Code installed: $(claude --version 2>/dev/null || echo 'version unknown')"
     else
-        warn "Claude Code installation via npm failed"
-        warn "  Manual install: npm install -g @anthropic-ai/claude-code"
-        warn "  Note: Requires Anthropic API key (user provides this)"
+        step "Installing Claude Code..."
+        npm install -g @anthropic-ai/claude-code 2>/dev/null || true
+
+        if command -v claude > /dev/null 2>&1; then
+            ok "Claude Code installed"
+        else
+            warn "Claude Code installation via npm failed"
+            warn "  Manual install: npm install -g @anthropic-ai/claude-code"
+            warn "  Note: Requires Anthropic API key (user provides this)"
+        fi
     fi
+else
+    step "Skipping Claude Code (not selected)"
 fi
 
 # ── 3. Install/Verify OpenCode ────────────────────────────────────────────
-step "Checking OpenCode..."
-
-if command -v opencode > /dev/null 2>&1; then
-    ok "OpenCode installed: $(opencode --version 2>/dev/null || echo 'version unknown')"
-else
-    step "Installing OpenCode..."
-    npm install -g @ oh-my-opencode/cli 2>/dev/null || \
-    npm install -g opencode 2>/dev/null || \
-    npm install -g @anthropic-ai/opencode 2>/dev/null || true
+if wants opencode; then
+    step "Checking OpenCode..."
 
     if command -v opencode > /dev/null 2>&1; then
-        ok "OpenCode installed"
+        ok "OpenCode installed: $(opencode --version 2>/dev/null || echo 'version unknown')"
     else
-        warn "OpenCode installation via npm failed"
-        warn "  Manual: check https://github.com/oh-my-opencode/opencode for latest install"
+        step "Installing OpenCode..."
+        # Real package: opencode-ai (sst/opencode); brew tap as fallback.
+        npm install -g opencode-ai 2>/dev/null || \
+        brew install sst/tap/opencode 2>/dev/null || true
+
+        if command -v opencode > /dev/null 2>&1; then
+            ok "OpenCode installed"
+        else
+            warn "OpenCode installation failed"
+            warn "  Manual: npm install -g opencode-ai  (see https://opencode.ai)"
+        fi
     fi
+else
+    step "Skipping OpenCode (not selected)"
 fi
 
 # ── 4. Install/Verify Codex CLI ───────────────────────────────────────────
-step "Checking Codex CLI..."
-
-if command -v codex > /dev/null 2>&1; then
-    ok "Codex CLI installed: $(codex --version 2>/dev/null || echo 'version unknown')"
-else
-    step "Installing Codex CLI..."
-    # Codex can be installed via pip or npm depending on version
-    pip3 install codex-cli 2>/dev/null || \
-    npm install -g @anthropic-ai/codex-cli 2>/dev/null || \
-    npm install -g codex 2>/dev/null || true
+if wants codex; then
+    step "Checking Codex CLI..."
 
     if command -v codex > /dev/null 2>&1; then
-        ok "Codex CLI installed"
+        ok "Codex CLI installed: $(codex --version 2>/dev/null || echo 'version unknown')"
     else
-        warn "Codex CLI installation failed"
-        warn "  Manual: check official install instructions"
+        step "Installing Codex CLI..."
+        # Real package: @openai/codex (OpenAI's Codex CLI).
+        npm install -g @openai/codex 2>/dev/null || \
+        brew install codex 2>/dev/null || true
+
+        if command -v codex > /dev/null 2>&1; then
+            ok "Codex CLI installed"
+        else
+            warn "Codex CLI installation failed"
+            warn "  Manual: npm install -g @openai/codex"
+        fi
     fi
+else
+    step "Skipping Codex CLI (not selected)"
 fi
 
 # ── 5. Install/Verify tmux (session persistence) ──────────────────────────
