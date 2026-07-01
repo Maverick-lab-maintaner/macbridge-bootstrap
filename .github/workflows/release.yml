@@ -37,12 +37,14 @@ jobs:
           GOOS=darwin  GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/macbridge-${VERSION}-darwin-arm64  ./cmd/macbridge
           GOOS=darwin  GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/macbridge-${VERSION}-darwin-amd64  ./cmd/macbridge
           GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/macbridge-${VERSION}-windows-amd64.exe ./cmd/macbridge
-          (cd dist && sha256sum * > checksums.txt && cat checksums.txt)
+          # Only the built binaries — dist/homebrew/ (the committed formula
+          # template) lives in the same tree and is not a release asset.
+          (cd dist && sha256sum macbridge-* > checksums.txt && cat checksums.txt)
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" dist/* \
+          gh release create "${GITHUB_REF_NAME}" dist/macbridge-* dist/checksums.txt \
             --title "macbridge ${GITHUB_REF_NAME}" \
             --generate-notes
