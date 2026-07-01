@@ -2040,4 +2040,59 @@ With no local `shellcheck` binary, **CI was the authoritative check** — which 
 
 ---
 
+## Act XV: The Review Pass — Verifying a Critique Both Ways, and Paying Down Semantic Debt
+
+**Context:** A reviewer returned a careful, mostly-correct critique of the project's state — the Deploy A/B split, the Windows provisioning, the `httpx` transport, and the Radar connector's naming. The task was not to accept it or defend against it, but to *verify every claim against the repo with file and line*, correct the one point that was wrong, and act on the one that was right. It turned into a lesson about reviewing a review.
+
+### Verifying the critique, both directions
+
+Each claim was checked against the actual tree, not from memory:
+
+- "Deploy B still isn't real" → confirmed at `provision.go:29` (`Phase 1 API integration is not implemented yet`).
+- "Four of the five `provision.ps1` criticisms are already fixed" → confirmed: staging that excludes `.git`/`logs`/binaries (`:160`), `-Resume` + detached bootstrap (`:53`, `:202`), OpenSSH preflight (`:96`), UTF-8 `session.json` (`:258`). The reviewer's line numbers were slightly off from the real ones, but every substantive point held — so the critique was *strategically right, tactically current*.
+- "Radar uses `httpx`, not `httpx2`" → confirmed at `sources.py:11` and `test_sources.py:7`; zero `httpx2` anywhere in Radar.
+
+The discipline that mattered: a claim can be **stale in the direction of pessimism** (criticising something already fixed) just as easily as optimism. Verifying both ways — grep for the fix, not just the flaw — is what kept the response honest.
+
+### The one correction — `httpx2` is not the "stricter" choice
+
+The reviewer floated that strict alignment with the earlier Python skill-set might mean the code *should* use `httpx2`. That framing had to be pushed back on: `httpx2` is not a newer/stricter package — it carries typosquat signals (a `pydantic/httpx2` homepage that does not appear to exist, httpx's own tagline reused verbatim, a dependency on the similarly-squatted `httpcore2`). So standardising on `httpx` is the *secure* choice, not merely the pragmatic one. The lesson is sharp: a plausible-sounding "use the stricter/newer variant" suggestion can quietly reintroduce a supply-chain risk. Verify a package's legitimacy, not just whether its name matches a convention.
+
+### The debt that was real — HN names on a Reddit connector
+
+The reviewer's strongest point: the live connector fetches `https://www.reddit.com/search.rss` and tags leads `platform="reddit"`, yet every function was named for Hacker News — `load_hackernews_searches`, `fetch_hackernews_query`, `build_hackernews_queries`, `create_hackernews_client`. This was semantic debt from Act X, where the connector's *behaviour* migrated from a Hacker News API to Reddit RSS but its *names* did not.
+
+Grepping for callers turned up something the review had missed: `parse_hackernews_hit` was **dead code** — never called anywhere (`grep -rn` found only its definition), and it hardcoded `platform="hackernews"`, so if anyone had ever wired it up it would have mislabelled Reddit leads. Its only helper, `first_text`, was orphaned with it.
+
+### The rename — mechanical where safe, judged where not
+
+The fix mixed two techniques deliberately:
+
+- **`sed` for the four uniquely-named functions** across `sources.py`, `radar.py`, and `test_sources.py` (safe because the identifiers are long and unambiguous).
+- **Hand edits for everything `sed` could not judge:** the CLI flag `--hn`/`--hn-limit` → `--reddit`/`--reddit-limit` (and its "Hacker News" help text), the `run_scan` params `hn`/`hn_limit` → `reddit`/`reddit_limit`, the `"HN request/response"` log lines, the test names, and the README examples. `create_hackernews_client` became `create_http_client` rather than `create_reddit_client`, because it is also used by the RSS-feed path — the accurate name was the generic one.
+
+And one thing was **kept on purpose**: `engine.py`'s `PLATFORM_RISK["hackernews"]`. Hacker News is a legitimate *platform* a manual lead could reference; that entry is a risk-table row, not the misnamed connector. A rename is not a blind find-replace — the skill is telling the misnamed thing apart from the legitimately same-named thing.
+
+Result: **−34 lines** (mostly the dead code), `pytest` green, all five CI jobs passing.
+
+### Exact toolchain used in this pass
+
+- `grep -rn` to verify each critique claim at file:line, and to prove `parse_hackernews_hit` had no callers (dead) vs. functions that were live
+- `sed -i -e 's/old/new/g'` for the four unambiguous function renames across three files; `Edit` for the CLI/param/log/test/README nuances
+- `python -m compileall` + `python -m pytest -q` from `ops/radar/` (matching the CI job) to confirm the rename
+- `gh pr create` / `gh pr merge --squash --delete-branch`, `git -C "$R"` throughout; PRs #4 (this chronicle's siblings) and #5 (the rename)
+
+### What this changed
+
+Before: the connector said "Hacker News" in code and CLI while doing Reddit, with a dead HN-tagging function lurking. A reviewer's "use httpx2 for strictness" could have re-armed a supply-chain risk.
+
+After: the connector is named for what it does, the dead code is gone, the CLI flag is honest (`--reddit`), and the record explicitly states why `httpx2` stays out.
+
+### The operational lesson
+
+> Review the review. Verify every claim against the code both ways — grep for the fix as hard as for the flaw — correct the one that is wrong even when it sounds authoritative, and pay down the one that is right down to the dead code behind it.
+> Naming debt is the residue of a behaviour migration that changed what the code *does* without changing what it *says*.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
