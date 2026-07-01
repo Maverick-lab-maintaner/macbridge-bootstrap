@@ -292,6 +292,38 @@ differentiator demonstrated, not described. The rule:
 > against the real registry, and make the quiet warn-and-continue failure
 > a loud red in CI
 
+### 14. The maintenance layer scheduled itself
+
+The oldest fear in the project was the maintenance question:
+"Xcode updates break Flutter overnight — who catches it?"
+
+The audit found the answer already sitting in the repo:
+
+- the strict macOS smoke workflow WAS the designed Build Verification Agent,
+  minus a schedule — three lines of cron made it run every night, executing
+  a full agent-tier install through a real iOS build on a clean Mac
+- the release watchers had existed since v2 as standalone scripts with a
+  cron mode for a Mac that never materialized — a weekly ubuntu workflow now
+  runs them against the live Xcode and Flutter feeds
+
+The subtle work was "alert exactly once." The alert IS a red run (GitHub
+emails the owner — a path already proven by a real failure email). But
+Actions caches are immutable per key, and the default cache save skips on
+failure — the alerting run would have died before saving its advanced
+baseline, re-alarming every Monday forever. Explicit restore/save with
+`if: always()`, baseline advanced before the deliberate `exit 1`.
+
+The two signals split cleanly:
+
+> the watcher says "something shipped"
+> the nightly smoke says "did it break us"
+
+The rule this chapter earned:
+
+> before building the maintenance system, check whether you already built it —
+> and remember that "alert exactly once" is a statement about when state
+> persists relative to failure
+
 ## What Broke, and What It Taught
 
 ### Shell is good at orchestration
