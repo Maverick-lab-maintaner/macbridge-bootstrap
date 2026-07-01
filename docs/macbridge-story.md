@@ -248,6 +248,8 @@ The project grew from:
   manual work to its irreducible core (install Xcode once, snapshot once)
 - into a hardened Windows bring-up (a 35-minute bootstrap that survives a dropped SSH)
   and a read-only signing diagnoser that guides without ever touching the Apple account
+- into a live lead connector named for what it actually does — Reddit search RSS, not
+  Hacker News — with the dead code from the old approach removed
 
 The common rule across all of it is the same:
 
@@ -265,3 +267,10 @@ And three more rules, each earned from a real twist:
 > a quality gate you do not run is a gate that is already red
 > *(ShellCheck was failing on master for weeks behind a path filter; a parse error
 > was masking the warnings that hid behind it)*
+
+> review the review — verify every claim against the code both ways, correct the
+> one that is wrong even when it sounds authoritative, and pay down the one that is
+> right; naming debt is a behaviour migration that changed what the code does without
+> changing what it says
+> *(a critique was tactically stale on Windows, wrong to suggest the typosquat
+> `httpx2`, and right that the Reddit connector still wore Hacker News names)*
