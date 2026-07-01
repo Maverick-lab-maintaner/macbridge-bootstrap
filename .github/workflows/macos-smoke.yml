@@ -1,9 +1,16 @@
 name: macOS Smoke (free Apple-hardware test bed)
 
-# Manual on purpose: macOS runner minutes are limited, so run it on demand from the
-# Actions tab ("Run workflow"). This validates the tooling on REAL macOS without renting
-# a Mac — see docs/LOCAL_TESTING.md.
+# Two roles:
+#  1. On-demand test bed (workflow_dispatch) — validates the tooling on REAL
+#     macOS without renting a Mac. See docs/LOCAL_TESTING.md.
+#  2. NIGHTLY BUILD VERIFICATION AGENT (schedule) — the safety net from
+#     MAINTENANCE_AGENT_ARCHITECTURE: every night, a clean Mac runs the full
+#     agent-tier install through a real flutter build ios. When Apple or
+#     Flutter ships something that breaks the pipeline, this goes red and
+#     GitHub emails the owner BEFORE a customer hits it. Free on a public repo.
 on:
+  schedule:
+    - cron: "17 5 * * *" # nightly 05:17 UTC — full agent-tier bootstrap
   workflow_dispatch:
     inputs:
       run_bootstrap:
@@ -86,11 +93,12 @@ jobs:
           python3 -c "import json; d=json.load(open('/tmp/cli-signing.json')); print('cli signing state:', d['summary']['state'])"
 
       # Optional: the full product path — `macbridge install` end-to-end.
-      - name: macbridge install smoke (opt-in)
-        if: ${{ inputs.run_bootstrap }}
+      # Nightly runs always take the full path at agent tier; dispatches opt in.
+      - name: macbridge install smoke (opt-in / nightly)
+        if: ${{ inputs.run_bootstrap || github.event_name == 'schedule' }}
         run: |
           brew install --cask flutter || true
-          /tmp/macbridge install --from 2 --tier "${{ inputs.tier }}" --agents all
+          /tmp/macbridge install --from 2 --tier "${{ inputs.tier || 'agent' }}" --agents all
           /tmp/macbridge status
 
       # Agent tier only: the three advertised agents must actually resolve —
@@ -98,7 +106,7 @@ jobs:
       # on purpose: if a package name is wrong, we want red here, not on a
       # customer's Mac.
       - name: agents actually installed (agent tier)
-        if: ${{ inputs.run_bootstrap && inputs.tier == 'agent' }}
+        if: ${{ (inputs.run_bootstrap && inputs.tier == 'agent') || github.event_name == 'schedule' }}
         run: |
           for a in claude opencode codex; do
             if command -v "$a" >/dev/null 2>&1; then

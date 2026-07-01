@@ -144,9 +144,40 @@ checksums match). Five beta keys generated.
   system; `dashboard/customer-api.js` is the read-composition worker (contract + lease +
   SLA + license from KV, 24h floor computed server-side), dark-guarded. Wire when the
   first Managed customer or ~10 active beta users exist.
-- [ ] **UX test on a real Mac (the $15 Macly day).** The real customer path end-to-end:
-  `brew install` from the tap → `macbridge install` → `workspace-setup.sh` login studio →
-  `golden-image.sh build` → provider snapshot (finishes S2). This one rental validates the
-  imagined first-login experience *and* produces the golden image.
+- [ ] **UX test on a real Mac (the $15 Macly day) — script ready.** Run
+  `docs/REAL_MAC_TEST_SCRIPT.md`: 7 phases with pass criteria + timers (first live
+  `brew install` of the formula, agent-tier install via the TUI, the "type `claude`"
+  moment, the prepared-studio login, phone/tmux reconnect, golden-image snapshot
+  (finishes S2), cleanup + S5 usage data), ending in the promise scorecard whose exit
+  rule decides when LemonSqueezy flips on. **This is the next action.**
 - [ ] Apple Developer ID signing/notarization for direct downloads (Homebrew works without).
 - [ ] Decide the S7 tier structure (business).
+
+### Done since v0.1.0 (2026-07-01→02, Acts XX–XXII)
+
+- [x] **v0.1.0 shipped & verified** — public tap, tagged release (darwin arm64/amd64 +
+  windows + checksums), formula carries real sha256s; release binary executed; strict
+  smoke on the tag → 🟢 MAC READY; 5 beta keys minted. (Act XX)
+- [x] **Commerce + Dashboard built dark** — LemonSqueezy webhook (HMAC, idempotent,
+  dark-guarded) with byte-exact JS keygen (CI-gated JS↔Go both directions); dashboard V1
+  demo mode (all spec states) + customer-api worker (24h floor server-side). (Act XXI)
+- [x] **Agent selection TUI** — `macbridge install` asks which agents (1/2/3/a/n),
+  `--agents` for scripting, Layer 3 `wants()` gating; BYO-keys note in the prompt. (#18)
+- [x] **Two hallucinated agent packages fixed & PROVEN** — OpenCode (`@ oh-my-opencode/cli`
+  broken syntax → `opencode-ai`) and Codex (`@anthropic-ai/codex-cli` → `@openai/codex`).
+  Verified on a real Apple runner: **first agent-tier 🟢 MAC READY**, all three agents on
+  PATH, strict CI check keeps it that way. (Act XXII)
+- [x] **Nightly Build Verification Agent** — the smoke workflow now runs the full
+  agent-tier install (through a real `flutter build ios`) **every night at 05:17 UTC** on
+  a clean Mac runner. When Apple/Flutter/Homebrew/npm ship something breaking, it goes red
+  and GitHub emails the owner before a customer hits it. $0 (public repo). This implements
+  the safety net from `MAINTENANCE_AGENT_ARCHITECTURE.md`.
+
+### Maintenance posture (the "Xcode breaks overnight" question)
+
+Covered: nightly clean-Mac verification (above) + failure emails (path proven — a real
+failure notification already landed) + `doctor.sh` remediation (11 rules) + `migrate.sh`
+opt-in upgrades + strict CI gates. **Open:** the release watchers
+(`lib/watcher-xcode.sh`/`-flutter.sh`) are still unscheduled; `doctor-rules.json` grows
+only by discipline (every new breakage → a rule); no auto-escalation/user-notification
+flow yet (matters once Managed customers exist); single-maintainer risk is inherent.
