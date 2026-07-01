@@ -2095,4 +2095,64 @@ After: the connector is named for what it does, the dead code is gone, the CLI f
 
 ---
 
+## Act XVI: The License Read — Where the Real Constraint Was Hiding in the Business Model, Not the Law
+
+**Context:** Every prior act flagged "Apple ToS risk" as *existential and unexamined* — the one item `HONEST_ASSESSMENT.md` marked ❌ Not done. This act finally read the actual license instead of the fear of it. The twist: the law was fine. The thing that broke was the assumption the law quietly exposed — the multi-tenant margin model the whole business plan rested on.
+
+### Reading the license, not the rumour
+
+The research went to the primary source, not commentary. Two `WebSearch` queries located the governing clauses (leasing/virtualization terms; and how AWS complies), then the actual **macOS Sequoia SLA PDF** was fetched from `apple.com/legal/sla`. The first `WebFetch` summarised but could not reliably quote section numbers, so the goal became: get the *verbatim* text.
+
+### The PDF that would not open (a toolchain fight)
+
+Getting exact quotes out of a 4.6 MB PDF on a Windows box was its own small saga:
+
+1. `Read` on the saved PDF failed — `pdftoppm is not installed` (no poppler-utils for page rendering).
+2. Fell back to **`pypdf`** in Python to extract the text layer directly (`PdfReader(...).pages[*].extract_text()`), then located clauses by keyword search (`text.find("Lessee")`, `"twenty-four"`, `"service bureau"`).
+3. Hit a `UnicodeEncodeError: 'charmap' codec can't encode character 'ﬁ'` — the SLA uses a **ﬁ ligature** and curly quotes, and Windows Python's cp1252 stdout choked. The same fix from Act XII applied: `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`. (Third time this session that Windows stdout encoding bit — it is now a reflex.)
+
+With that, the exact clauses came out clean.
+
+### What the license actually says (verbatim)
+
+- **§2B(iii)** — up to **two (2)** VMs per Apple-branded machine, for *the owner's own* development/testing/personal use.
+- **§2B prohibition** — those VMs may not be used *"in connection with service bureau, time-sharing, terminal sharing, relay service or other similar types of services."*
+- **§3 "Leasing for Permitted Developer Services"** — you *may* lease/sublease, but each lease is *"a minimum period of twenty-four (24) consecutive hours,"* the end user must have *"sole and exclusive use and control"* of a dedicated Mac, and must agree to Apple's License. *"Permitted Developer Services"* is defined as continuous-integration / software-development / build / test / dev-tools use.
+
+### The finding: the law was never the risk — the pricing model was
+
+The question everyone feared was "is cloud Mac legal?" The real answer flipped the frame:
+
+> Cloud Mac is **legal** — §3 exists precisely for this, and MacBridge's purpose sits squarely inside "Permitted Developer Services." What is **not** legal is the **10-users-per-Mac / $8.90-COGS** model from `COST_BENEFIT_RISK_ANALYSIS.md`. §3's *"sole and exclusive use"* + *24-hour minimum*, and §2B's *time-sharing* ban, forbid exactly the multi-tenancy that produced those margins.
+
+This is the **persistence-vs-multitenancy tension** the audit had already flagged twice on operational grounds — now confirmed as a hard **legal** constraint. The earlier instinct was right; the license gave it teeth. Corroboration came from the industry itself: **AWS EC2 Mac bills a 24-hour minimum on bare-metal Dedicated Hosts "to comply with the Apple macOS Software License Agreement."** The compliant shape was staring back from a competitor's pricing page.
+
+### The consequence, and the reframe
+
+The finding killed the headline economics ($8.90 COGS, the $1.2M-Y3 projections nobody believed anyway) and forced a repricing. But the strategic reframe mattered more than the bad news:
+
+> It is not a legal problem, it is a pricing-*structure* problem — and the compliant structure (one dedicated Mac per user, ≥24h, or on-demand day-passes) actually *matches how sporadic iOS-build users behave better than the multi-tenant fantasy did.*
+
+That produced `docs/PRICING_STRATEGY.md`: four compliant options with worked per-unit economics — **C** software-only/BYO-Mac (~92% margin, zero Apple exposure, and the repo's own "bootstrap is the product" thesis), **B** on-demand ≥24h dedicated (~38%), **A** dedicated monthly (~29%), **D** reseller/partner (provider carries the license). Recommendation: **software-core + managed-convenience**, replacing the dead $19/$39/$79 multi-tenant table with **$19/mo tooling · $29/day build pass · $139/mo dedicated.**
+
+### The discipline that kept it honest
+
+- **Quoted the license verbatim** with section numbers — no paraphrase-as-fact.
+- **Refused to project totals.** Per-unit economics only; no revenue fantasy, because `HONEST_ASSESSMENT.md` says measure before projecting and the old projections were already disbelieved.
+- **Flagged "not legal advice"** and recommended a lawyer review the sublease chain (Apple → provider → MacBridge → customer) — the analysis is due diligence, not a legal opinion.
+
+### Exact toolchain used in this pass
+
+- `WebSearch` (two queries: the SLA leasing/VM terms; AWS EC2 Mac 24h-minimum compliance) → located clauses and industry corroboration
+- `WebFetch` on `apple.com/legal/sla/docs/macOSSequoia.pdf` (summary + saved the 4.6 MB binary locally)
+- `Read` on the PDF → failed (no poppler); **`pypdf`** text extraction + keyword `find()` for clause location; `sys.stdout.reconfigure(encoding="utf-8")` for the ﬁ-ligature/cp1252 error
+- deliverables: `docs/APPLE_LICENSE_COMPLIANCE.md`, `docs/PRICING_STRATEGY.md`, `shortlist.md` (S1 done, new S7); `gh pr` #7 and #8
+
+### The operational lesson
+
+> Read the actual contract, not the fear of it — and the constraint that bites is usually the one your margin model was quietly ignoring.
+> The "existential Apple risk" was never the law; it was a business assumption the law refused to permit. Verify the primary source verbatim, and let it correct the plan rather than the plan pre-deciding what the source must say.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
