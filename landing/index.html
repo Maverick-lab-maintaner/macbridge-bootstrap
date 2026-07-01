@@ -333,22 +333,40 @@
 
   /* ── Pricing ─────────────────────────────────────────────────────────── */
 
+  .pricing-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);
+    max-width: 800px; margin: 0 auto;
+  }
   .pricing-card {
-    max-width: 440px; margin: 0 auto;
     background: var(--surface-secondary);
     border: var(--depth-card);
     border-radius: 16px;
     padding: var(--space-10);
     text-align: center;
+    transition: border-color var(--ease-standard), transform var(--ease-standard);
+  }
+  .pricing-card:hover { transform: translateY(-2px); }
+  .pricing-card-featured {
+    border: var(--depth-featured);
+    background: var(--surface-elevated);
+    box-shadow: 0 0 32px rgba(89, 224, 208, 0.06);
+    position: relative;
+  }
+  .pricing-badge {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: var(--accent-primary); color: #081017;
+    font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700;
+    padding: 4px 14px; border-radius: 100px;
+    letter-spacing: 0.06em; text-transform: uppercase;
   }
   .pricing-card .overline { margin-bottom: var(--space-2); display: inline-block; }
   .pricing-card .price {
-    font-family: var(--font-mono); font-size: 3.2rem; font-weight: 600;
+    font-family: var(--font-mono); font-size: 2.8rem; font-weight: 600;
     color: var(--accent-primary); line-height: 1; margin-bottom: var(--space-1);
   }
   .pricing-card .price-period { font-size: 0.85rem; color: var(--text-tertiary); margin-bottom: var(--space-6); }
   .pricing-card .check-list { margin-bottom: var(--space-8); }
-  .pricing-card .check-list.good li { font-size: 0.9rem; }
+  .pricing-card .check-list.good li { font-size: 0.85rem; }
 
   /* ── Footer ──────────────────────────────────────────────────────────── */
 
@@ -573,23 +591,43 @@
   <div class="container">
     <div class="section-header">
       <span class="overline">Pricing</span>
-      <h2>One tier. Everything included.</h2>
+      <h2>Two tiers. Your choice of agent.</h2>
     </div>
-    <div class="pricing-card">
-      <span class="overline">Flutter Creator</span>
-      <div class="price">$19<span style="font-size: 1rem;">/mo</span></div>
-      <p class="price-period">Pay as you go. Stop anytime.</p>
-      <ul class="check-list good" style="text-align: left;">
-        <li>Production-ready macOS environment</li>
-        <li>Xcode 26.6 + iOS Simulator pre-installed</li>
-        <li>Flutter, CocoaPods, Ruby, Homebrew</li>
-        <li>Claude Code, OpenCode, Codex CLI</li>
-        <li>SSH + DeskIn GUI access</li>
-        <li>tmux session persistence (cross-device)</li>
-        <li>Auto-stop after 15 min idle (no wasted cost)</li>
-        <li>Golden image — fresh Mac in 60 seconds</li>
-      </ul>
-      <a href="#cta" class="cta" style="width: 100%; justify-content: center;">Start building <span class="cta-arrow">→</span></a>
+    <div class="pricing-grid">
+      <!-- Vanilla -->
+      <div class="pricing-card">
+        <span class="overline">Vanilla</span>
+        <div class="price">$19<span style="font-size: 0.9rem;">/mo</span></div>
+        <p class="price-period">For traditional Flutter devs. "Just give me a Mac that works."</p>
+        <ul class="check-list good" style="text-align: left;">
+          <li>Production-ready macOS environment</li>
+          <li>Xcode 26.6 + iOS Simulator</li>
+          <li>Flutter, CocoaPods, Ruby, Homebrew</li>
+          <li>Git + GitHub CLI</li>
+          <li>SSH + DeskIn GUI access</li>
+          <li>Golden image — fresh Mac in 60s</li>
+          <li>Auto-stop after 15 min idle</li>
+        </ul>
+        <a href="#cta" class="cta cta-secondary" style="width: 100%; justify-content: center;">Start building <span class="cta-arrow">→</span></a>
+      </div>
+      <!-- Agent -->
+      <div class="pricing-card pricing-card-featured">
+        <span class="pricing-badge">Most Popular</span>
+        <span class="overline">Agent</span>
+        <div class="price">$39<span style="font-size: 0.9rem;">/mo</span></div>
+        <p class="price-period">For vibe coders. "Give me a Mac with my AI assistant ready."</p>
+        <ul class="check-list good" style="text-align: left;">
+          <li>Everything in Vanilla</li>
+          <li>Claude Code pre-installed</li>
+          <li>OpenCode pre-installed</li>
+          <li>Codex CLI pre-installed</li>
+          <li>tmux session persistence</li>
+          <li>Cross-device (laptop → phone)</li>
+          <li>Flutter/Firebase/iOS skill library</li>
+          <li>Agent-ready — type and code</li>
+        </ul>
+        <a href="#cta" class="cta" style="width: 100%; justify-content: center;">Start building <span class="cta-arrow">→</span></a>
+      </div>
     </div>
   </div>
 </section>

@@ -74,7 +74,8 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --from N      Start from layer N (0-4)"
-            echo "  --tier TYPE   Provisioning tier (agent = all layers)"
+            echo "  --tier TYPE   Provisioning tier: vanilla (no agents, $19/mo) or agent (full, $39/mo)"
+            echo "  --report-to URL  Ship layer results to central endpoint (POST JSON)"
             echo "  --report-to URL  Ship layer results to central endpoint (POST JSON)"
             echo "  --help        Show this help"
             exit 0
@@ -169,7 +170,15 @@ FAILED_LAYER=0
 run_layer 0 "Machine Reachable"  "${LIB_DIR}/layer0-machine.sh"  || FAILED_LAYER=0
 run_layer 1 "Apple Toolchain"    "${LIB_DIR}/layer1-apple.sh"     || FAILED_LAYER=1
 run_layer 2 "Development Tools"  "${LIB_DIR}/layer2-dev.sh"       || FAILED_LAYER=2
-run_layer 3 "AI Agents"          "${LIB_DIR}/layer3-agents.sh"    || FAILED_LAYER=3
+
+if [ "$TIER" = "vanilla" ]; then
+    echo -e "${YELLOW}⏭️  Skipping Layer 3 (--tier vanilla — no AI agents)${NC}"
+    echo ""
+    LAYER_STATUS[3]="SKIPPED"
+else
+    run_layer 3 "AI Agents"      "${LIB_DIR}/layer3-agents.sh"    || FAILED_LAYER=3
+fi
+
 run_layer 4 "Smoke Test"         "${LIB_DIR}/layer4-project.sh"   || FAILED_LAYER=4
 
 # ── Summary ────────────────────────────────────────────────────────────────
@@ -216,23 +225,32 @@ if [ "$FAILED_LAYER" -eq 0 ] && \
    [ "${LAYER_STATUS[0]}" != "FAILED" ] && \
    [ "${LAYER_STATUS[1]}" != "FAILED" ] && \
    [ "${LAYER_STATUS[2]}" != "FAILED" ] && \
-   [ "${LAYER_STATUS[3]}" != "FAILED" ] && \
    [ "${LAYER_STATUS[4]}" != "FAILED" ]; then
 
     echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${GREEN}║                                                              ║${NC}"
-    echo -e "${BOLD}${GREEN}║  🟢 MAC READY                                                ║${NC}"
+    echo -e "${BOLD}${GREEN}║  🟢 MAC READY — ${TIER} tier                                  ║${NC}"
     echo -e "${BOLD}${GREEN}║                                                              ║${NC}"
     echo -e "${BOLD}${GREEN}║  All layers passed. This Mac is provisioned for:             ║${NC}"
     echo -e "${BOLD}${GREEN}║  • Flutter iOS development                                   ║${NC}"
-    echo -e "${BOLD}${GREEN}║  • AI coding agents (Claude Code, OpenCode, Codex)           ║${NC}"
-    echo -e "${BOLD}${GREEN}║  • Session persistence via tmux                              ║${NC}"
+
+    if [ "$TIER" = "agent" ]; then
+        echo -e "${BOLD}${GREEN}║  • AI coding agents (Claude Code, OpenCode, Codex)           ║${NC}"
+        echo -e "${BOLD}${GREEN}║  • Session persistence via tmux                              ║${NC}"
+    fi
+
     echo -e "${BOLD}${GREEN}║                                                              ║${NC}"
     echo -e "${BOLD}${GREEN}║  Next steps:                                                 ║${NC}"
     echo -e "${BOLD}${GREEN}║  1. Add SSH key to GitHub (printed in Layer 2)              ║${NC}"
     echo -e "${BOLD}${GREEN}║  2. Run: gh auth login (GitHub device flow)                  ║${NC}"
     echo -e "${BOLD}${GREEN}║  3. Clone your project: git clone git@github.com:...         ║${NC}"
-    echo -e "${BOLD}${GREEN}║  4. Start coding: claude / opencode / codex                  ║${NC}"
+
+    if [ "$TIER" = "agent" ]; then
+        echo -e "${BOLD}${GREEN}║  4. Start coding: claude / opencode / codex                  ║${NC}"
+    else
+        echo -e "${BOLD}${GREEN}║  4. Start coding: flutter run / flutter build ios            ║${NC}"
+    fi
+
     echo -e "${BOLD}${GREEN}║                                                              ║${NC}"
     echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
