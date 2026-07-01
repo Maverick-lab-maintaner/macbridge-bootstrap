@@ -40,8 +40,12 @@ Legend: `[ ]` open · `[x]` done · `[~]` deferred (needs API/scale work) · `[!
   actually lives and what makes the "0 minutes" claim true. Requires a Mac + GUI once.
 - [!] **S3 — Test provider abstraction** — confirm `bootstrap.sh` runs identically on
   Macly AND VPSMAC without modification.
-- [!] **S4 — Code-signing diagnoser.** The #1 user pain after setup. Currently
-  "diagnose, don't handle" — not implemented. Could start as a `doctor` rule.
+- [x] **S4 — Code-signing diagnoser.** The #1 user pain after setup. Implemented as
+  read-only `signing-doctor.sh`: checks signing identities (valid + expired counts),
+  provisioning profiles, and — with `--project PATH` — the project's bundle id and
+  DEVELOPMENT_TEAM, flagging team/keychain mismatches. Reuses the status contract
+  (`--json`), prints Apple-guide links, and never creates certs or touches the Apple
+  account. *v1 done; future: decode profiles to match bundle id ↔ profile.*
 - [!] **S5 — Instrument real usage** (hours/day, concurrent users per Mac). The whole
   margin model rests on the unvalidated 10-users-per-Mac assumption; measure it before
   trusting the COGS. Note the tension with "your data persists" (persistence vs. multi-tenancy).
@@ -51,9 +55,9 @@ Legend: `[ ]` open · `[x]` done · `[~]` deferred (needs API/scale work) · `[!
 
 ## What's left (running tally)
 
-**Done (4/4 code items):** W1, W2, W3, W4 — all `provision.ps1` fixes implemented and
-syntax-validated. Not yet live-tested against a real Mac (no Mac available this session);
-verified via the PowerShell AST parser and by inspecting the generated remote commands.
+**Done (5 items): W1, W2, W3, W4** (`provision.ps1`) **+ S4** (`signing-doctor.sh`).
+All implemented and validated locally (PowerShell AST parser for the `.ps1`; mocked
+`security` + fake project for the diagnoser). Neither has had a live run on a real Mac yet.
 
 **Left — nothing I can implement in code without new inputs:**
 
@@ -63,10 +67,10 @@ verified via the PowerShell AST parser and by inspecting the generated remote co
 | S1 | Apple ToS due diligence | 30-min human research task. **Gates charging anyone.** |
 | S2 | Golden image + auto-arranged workspace | Needs a Mac + one-time GUI session. This is where the UX lives. |
 | S3 | Provider abstraction test | Needs accounts on two providers. |
-| S4 | Code-signing diagnoser | Buildable next as a `doctor` rule — say the word and I'll start it. |
 | S5 | Usage instrumentation | Needs a running beta Mac to measure; `healthd` already emits usage events to build on. |
 | S6 | Conversion measurement | Needs real beta users. |
 
 **The single most important next step is S2 (golden image)** — it delivers the "excellent
 UX" and validates the "0 minutes" promise. S1 (Apple ToS) is the cheapest and must precede
-any charging. Everything in section A is now off your plate.
+any charging. Sections A and S4 are now off your plate; everything remaining needs a real
+Mac, a provider, or beta users.
