@@ -250,6 +250,9 @@ The project grew from:
   and a read-only signing diagnoser that guides without ever touching the Apple account
 - into a live lead connector named for what it actually does — Reddit search RSS, not
   Hacker News — with the dead code from the old approach removed
+- into a business that finally read its own governing license (Apple's macOS SLA) and
+  discovered the risk was never the law but the multi-tenant margin model the law forbids —
+  then repriced around what §3 actually permits (1 dedicated Mac per user, ≥24h)
 
 The common rule across all of it is the same:
 
@@ -274,3 +277,8 @@ And three more rules, each earned from a real twist:
 > changing what it says
 > *(a critique was tactically stale on Windows, wrong to suggest the typosquat
 > `httpx2`, and right that the Reddit connector still wore Hacker News names)*
+
+> read the actual contract, not the fear of it — the constraint that bites is usually
+> the one your margin model was quietly ignoring
+> *(Apple's macOS SLA permits leasing dev Macs; it was the 10-users-per-Mac COGS
+> assumption, not the law, that was never allowed)*

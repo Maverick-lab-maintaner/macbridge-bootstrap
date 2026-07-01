@@ -98,7 +98,7 @@ locally (AST parser, mocked contracts, `--dry-run`) but **not yet run on a real 
 | ID | Item | Blocked on |
 |----|------|-----------|
 | S2 (finish) | Golden image **snapshot** | Install Xcode via GUI once + snapshot via provider console. `golden-image.sh build` guides it. |
-| S7 (new) | **Reprice for 1:1 dedicated Macs** | Consequence of S1: the multi-tenant COGS model is not license-compliant. Business decision + lawyer review of the sublease chain. |
+| S7 | **Reprice for 1:1 dedicated Macs** | Analysis done — `docs/PRICING_STRATEGY.md` (four options + unit economics; recommends software-core + managed-convenience). Pending on you: the provider-resale ToS check (decides B vs D), a tier decision, and a lawyer review. |
 | W5 / S3 | Provider API + multi-provider test | A chosen provider (Macly/VPSMAC) + API keys. |
 | S5 | Usage instrumentation | A running beta Mac to measure (`healthd` already emits usage events to build on). |
 | S6 | Conversion measurement | Real beta users. |
