@@ -2272,4 +2272,56 @@ Before: the tooling was "validated locally, never run on a real Mac" — and tha
 
 ---
 
+## Act XIX: Studio P0 — The CLI Becomes the Product, and `macbridge install` Reaches MAC READY on Real Hardware
+
+**Context:** With the pivot decided (Act XVII) and the tooling proven on real macOS (Act XVIII), the missing piece was the one that makes money possible: nobody could *buy or install* Studio. This act built P0 from `docs/STUDIO_PACKAGING.md` — the self-contained CLI, the license gate, and the distribution scaffolding — and validated the whole surface on a real Mac before merging.
+
+### The design: a binary that carries its own tooling
+
+The core move is `tooling.go` at the repo root: a `package tooling` with `//go:embed *.sh lib/*.sh lib/doctor-rules.json`, embedding the entire shell tree into the Go binary. (Placement matters: `go:embed` cannot reference parent directories, so the embed lives at the root where the scripts are, and `cmd/macbridge` imports the root package.) On first use the CLI extracts to `~/.macbridge/tooling` with a `.version` stamp — same version skips re-extraction, an upgrade re-extracts. The customer never clones the repo; `brew install macbridge` is the whole story.
+
+On top of that:
+
+- **`macbridge install [--tier --from]`** runs the layered bootstrap *on the Mac it executes on* — Studio local mode, darwin-guarded with a pointer to `--host` elsewhere.
+- **`status` and `doctor` go local when `--host` is absent** (remote mode unchanged for Managed/operator use). One CLI, two deployment models — exactly the two-product/one-codebase shape from `BUSINESS_MODELS.md`.
+- **The license gate** (`internal/license`): keys shaped `MB-XXXX-XXXX-XXXX-CCCC` over an ambiguity-free alphabet (no I/L/O/U/0/1), with an FNV-1a checksum group so validation is fully offline; activation recorded in `~/.macbridge/license.json` with a 30-day grace field for the P1 updates channel to refresh. Free covers install/verify/readiness/basic doctor; Pro gates signing diagnosis (local only — deliberately soft enforcement, per the spec: the durable value is the knowledge channel, not DRM). The generator is `cmd/mbkeygen`, a vendor-only tool — the release workflow builds **only** `./cmd/macbridge`, because a generator that ships in the product makes keys worthless.
+- **Distribution scaffolding:** a tag-triggered `release.yml` (darwin arm64/amd64 + windows, checksums, ldflags-stamped version) and a Homebrew formula template under `dist/homebrew/` (gitignored `dist/*` except the formula). Signing/notarization is explicitly deferred until Apple credentials exist.
+
+### The test bed became the product's regression gate
+
+`macos-smoke.yml` was upgraded from "run the scripts" to "exercise the product surface": build the CLI on the Mac runner, run the license lifecycle (starts free → keygen → activate → persists as pro → **rejects a tampered key**), run local `status`/`doctor`/`--signing --json`, and — opt-in — run **`macbridge install --from 2 --tier vanilla` strictly** (no `|| true`): if any layer fails, the workflow fails. The failing path *is* the regression test.
+
+### The twist: the strict gate immediately caught a known bug class, again
+
+First dispatch: everything passed **except** `macbridge install` — Layer 2 died in 0 seconds right after "Checking Homebrew…", while Layer 4 (running independently later in the same bootstrap) built iOS fine. The culprit: `BREW_VERSION=$(brew --version 2>/dev/null | head -1)` — **the exact SIGPIPE-under-`pipefail` class Act XVIII had fixed in `verify.sh`, still alive in the layer scripts.** The humbling detail: this same line had *passed* in Act XVIII's run — SIGPIPE is a race (the writer must write after the reader closes), so it passes one run and kills the next. That flakiness is precisely why the earlier fix should have been a repo-wide sweep instead of a single-file fix. The sweep happened now: `grep -rn '| head -1'` across the tree, `|| true` inside every unguarded `$( … | head -1)` substitution (layer1, layer2 ×4, migrate; `_utils.sh` and `XCODE_VERSION` already had guards; `workspace-setup`'s instance runs without `set -e`).
+
+Second dispatch, fully strict:
+
+```
+✅ Layer 2 passed (41s)   ✅ Layer 4 passed (94s)
+✅ iOS build succeeded — Flutter → iOS pipeline verified
+║  🟢 MAC READY — vanilla tier ║
+```
+
+**`macbridge install` — the actual product command a customer will run — provisions a real Mac to MAC READY.** Distance-to-first-dollar is now: create the Homebrew tap, cut a tag, hand a beta user a key from `mbkeygen`.
+
+### Exact toolchain used in this pass
+
+- Go `embed` (root-package pattern for parent-dir scripts), `cobra` (`SilenceUsage/SilenceErrors` so runtime errors print once), `-ldflags -X` version stamping
+- `internal/license`: FNV-1a checksum keys, `crypto/rand` generation; unit tests for generate/validate/tamper/normalize/activate/status (temp `HOME`/`USERPROFILE` so tests never touch the real record)
+- extraction tests: embedded-tree completeness, exec bits (POSIX-only assert), version-stamp skip/re-extract semantics
+- local CLI smoke on Windows before any dispatch: `--version`, free→pro lifecycle, checksum rejection, darwin guards
+- two `gh workflow run … -f run_bootstrap=true` dispatches on the branch; log forensics via the Act XVIII sed/grep pipeline
+
+### What this changed
+
+Before: a proven toolchain nobody could install, and a conversion rate of 0% by construction. After: a self-contained, versioned, license-gated binary whose install path is proven on real Apple hardware and guarded by a strict CI regression gate. What remains for revenue is operational, not code: the tap repo, a signed release, LemonSqueezy checkout, and beta keys.
+
+### The operational lesson
+
+> When you fix a bug class, sweep for the class — not the instance. And make the product surface itself the regression test.
+> Act XVIII fixed `| head -1` under `pipefail` in one file; the same pattern two files away flaked the very next strict run. The grep cost thirty seconds. The strict `macbridge install` gate is what forced the issue — a lenient `|| true` smoke would have shipped the flake to the first customer.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
