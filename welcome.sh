@@ -33,12 +33,13 @@ export MACBRIDGE_LOG_DIR="${SCRIPT_DIR}/logs"
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
-SKIP_GITHUB=false; REPO_URL=""
+SKIP_GITHUB=false; REPO_URL=""; TIER="agent"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-github) SKIP_GITHUB=true; shift ;;
         --repo) REPO_URL="$2"; shift 2 ;;
+        --tier) TIER="$2"; shift 2 ;;
         *) shift ;;
     esac
 done
@@ -117,12 +118,19 @@ if [ "$SKIP_GITHUB" = false ]; then
     echo ""
 fi
 
-# ── Step 2: AI Provider API Keys ───────────────────────────────────────────
-
-echo -e "${BOLD}[2/4] AI Provider Setup${NC}"
-echo ""
+# ── Step 2: AI Provider API Keys (agent tier only) ──────────────────────────
 
 PROVIDERS_CONFIGURED=0
+
+if [ "$TIER" = "vanilla" ]; then
+    echo -e "${BOLD}[2/4] AI Provider Setup${NC}"
+    echo ""
+    echo -e "  ${YELLOW}⏭️${NC}  Skipped — vanilla tier does not include AI agents."
+    echo -e "  ${CYAN}→${NC}   Upgrade to agent tier ($39/mo) for Claude Code, OpenCode, and Codex."
+    echo ""
+else
+    echo -e "${BOLD}[2/4] AI Provider Setup${NC}"
+    echo ""
 
 setup_claude() {
     echo -e "  ${BOLD}Claude Code (Anthropic)${NC}"
@@ -192,6 +200,7 @@ echo ""
 setup_codex
 
 echo ""
+fi
 
 # ── Step 3: Clone Project ──────────────────────────────────────────────────
 
@@ -238,23 +247,43 @@ echo ""
 echo -e "  ${BOLD}Quick reference:${NC}"
 echo ""
 echo -e "  ${CYAN}Attach session:${NC}     tmux attach -t macbridge"
-echo -e "  ${CYAN}Start Claude:${NC}       claude"
-echo -e "  ${CYAN}Start OpenCode:${NC}     opencode"
-echo -e "  ${CYAN}Start Codex:${NC}       codex"
+
+if [ "$TIER" = "agent" ]; then
+    echo -e "  ${CYAN}Start Claude:${NC}       claude"
+    echo -e "  ${CYAN}Start OpenCode:${NC}     opencode"
+    echo -e "  ${CYAN}Start Codex:${NC}       codex"
+else
+    echo -e "  ${CYAN}Start coding:${NC}      flutter run / flutter build ios"
+fi
+
 echo -e "  ${CYAN}Build iOS:${NC}         cd ~/project && flutter build ios"
 echo -e "  ${CYAN}Health check:${NC}      bash verify.sh"
 echo ""
 
-if [ "$PROVIDERS_CONFIGURED" -eq 0 ]; then
+if [ "$TIER" = "agent" ] && [ "$PROVIDERS_CONFIGURED" -eq 0 ]; then
     echo -e "  ${YELLOW}⚠️  No AI providers configured. Set API keys to use agents.${NC}"
+    echo ""
+fi
+
+if [ "$TIER" = "vanilla" ]; then
+    echo -e "  ${GREEN}✅${NC} Vanilla tier — Flutter iOS toolchain only"
+    echo -e "  ${CYAN}💡${NC}  Upgrade to agent tier ($39/mo): pre-installed AI agents + skill library"
     echo ""
 fi
 
 echo -e "  ${GREEN}✅${NC} GitHub: $(gh auth status 2>&1 | grep -oE 'Logged in to github.com as [^ ]+' || echo 'not configured')"
 echo -e "  ${GREEN}✅${NC} tmux session: macbridge"
-echo -e "  ${GREEN}✅${NC} AI providers: ${PROVIDERS_CONFIGURED}/3 configured"
+
+if [ "$TIER" = "agent" ]; then
+    echo -e "  ${GREEN}✅${NC} AI providers: ${PROVIDERS_CONFIGURED}/3 configured"
+fi
+
 echo ""
 
-echo -e "  ${CYAN}💡${NC}  From your phone: install Termius → add SSH key → tmux attach -t macbridge"
-echo -e "  ${CYAN}💡${NC}  Agent keeps working. You switch devices. Session stays alive."
+if [ "$TIER" = "agent" ]; then
+    echo -e "  ${CYAN}💡${NC}  From your phone: install Termius → add SSH key → tmux attach -t macbridge"
+    echo -e "  ${CYAN}💡${NC}  Agent keeps working. You switch devices. Session stays alive."
+else
+    echo -e "  ${CYAN}💡${NC}  Need AI agents? Re-provision with: bash bootstrap.sh --tier agent"
+fi
 echo ""
