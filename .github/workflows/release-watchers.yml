@@ -1,0 +1,66 @@
+name: Release Watchers (Xcode + Flutter)
+
+# The ecosystem tripwire from MAINTENANCE_AGENT_ARCHITECTURE.md: every Monday,
+# check Apple's and Flutter's release feeds against the last-seen baseline.
+# A NEW release turns the run RED -> GitHub emails the owner -> golden-image
+# rebuild + nightly-smoke attention. Complements the nightly Build Verification
+# Agent: the watcher says "something shipped", the nightly smoke says whether
+# it broke us.
+#
+# State: .cache/*.txt persisted via actions/cache (explicit save with
+# if: always(), so the baseline advances even on an alerting run — each new
+# release alerts exactly once, then goes green until the next one).
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  watch:
+    name: Check upstream releases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore watcher baseline
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache
+          key: watchers-state-${{ github.run_id }}
+          restore-keys: |
+            watchers-state-
+
+      - name: Run watchers
+        id: watch
+        run: |
+          set -uo pipefail
+          NEW=0
+
+          echo "## Release Watchers" >> "$GITHUB_STEP_SUMMARY"
+          for w in lib/watcher-xcode.sh lib/watcher-flutter.sh; do
+            OUT="$(bash "$w" 2>&1 || true)"
+            echo "$OUT"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$OUT" | grep -E "Latest|Known|NEW|No new|baseline" >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            if echo "$OUT" | grep -q "NEW .* RELEASE"; then
+              NEW=1
+            fi
+          done
+
+          echo "new_release=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Save watcher baseline
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache
+          key: watchers-state-${{ github.run_id }}
+
+      # Red run = the alert email. The baseline already advanced above, so
+      # this fires exactly once per new release.
+      - name: Alert on new release
+        if: steps.watch.outputs.new_release == '1'
+        run: |
+          echo "::error::New Xcode or Flutter release detected — check the step summary. Action: rebuild the golden image (docs/RELEASE_CHECKLIST.md) and watch the nightly smoke."
+          exit 1
