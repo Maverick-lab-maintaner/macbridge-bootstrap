@@ -12,13 +12,23 @@ var (
 
 var RootCmd = &cobra.Command{
 	Use:   "macbridge",
-	Short: "MacBridge - Provision and manage cloud Mac development environments",
-	Long: `MacBridge gives Flutter developers a production-ready iOS build
-environment in 60 seconds. Provision a cloud Mac, run bootstrap,
-and start building without buying a Mac.`,
+	Short: "MacBridge - The continuously verified iOS development workspace",
+	Long: `MacBridge Studio turns a Mac you provide — cloud or one you own — into a
+verified Flutter/iOS workspace: layered bootstrap, health verification,
+doctor remediation, signing diagnosis, and an agent-ready environment.
+
+Run it on the Mac itself (Studio), or drive a remote Mac with --host.`,
+	// main.go prints the error once; don't also dump usage on runtime errors.
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 func init() {
+	RootCmd.Version = Version
+
+	RootCmd.AddCommand(installCmd)
+	RootCmd.AddCommand(activateCmd)
+	RootCmd.AddCommand(licenseCmd)
 	RootCmd.AddCommand(provisionCmd)
 	RootCmd.AddCommand(statusCmd)
 	RootCmd.AddCommand(doctorCmd)

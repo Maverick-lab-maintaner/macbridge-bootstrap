@@ -29,7 +29,28 @@ After bootstrap completes, the Mac has:
 | tmux (session persistence) | ✅ Configured |
 | SSH keepalive | ✅ Configured |
 
-## Quick Start
+## Quick Start — Studio CLI (the product)
+
+The `macbridge` binary is self-contained: it embeds the entire tooling and extracts it on
+first use, so a customer never clones this repo.
+
+```bash
+# On the Mac (yours or a cloud one):
+macbridge install --tier vanilla    # bootstrap -> verify -> flutter build ios smoke
+macbridge status                    # health TUI for THIS Mac (add --host for a remote one)
+macbridge doctor                    # remediation guidance
+
+# Studio Pro (signing diagnosis, workspace, golden image, updates):
+macbridge activate MB-XXXX-XXXX-XXXX-XXXX
+macbridge doctor --signing --project ~/myapp
+```
+
+Free tier: `install`, `status`/verify, readiness, basic `doctor`. Pro adds signing diagnosis,
+the prepared-studio workspace, golden image, and the updates channel. Distribution: GitHub
+Releases on tags (`.github/workflows/release.yml`) + a Homebrew formula template
+(`dist/homebrew/macbridge.rb`). See [docs/STUDIO_PACKAGING.md](docs/STUDIO_PACKAGING.md).
+
+## Quick Start — from source
 
 ```bash
 # Clone this repo on a fresh macOS machine

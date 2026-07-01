@@ -49,10 +49,41 @@ jobs:
           bash golden-image.sh manifest > /tmp/manifest.json
           python3 -c "import json; d=json.load(open('/tmp/manifest.json')); print('xcode:', d['components']['xcode'])"
 
-      # Optional: the closest thing to a rented Mac, for $0.
-      - name: bootstrap smoke (opt-in)
+      # ── Studio CLI on real macOS: the actual product surface ──
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: go.sum
+
+      - name: Build the macbridge CLI (embedded tooling)
+        run: |
+          go test ./internal/license/ ./cmd/macbridge/...
+          go build -o /tmp/macbridge ./cmd/macbridge
+          /tmp/macbridge --version
+
+      - name: CLI license lifecycle (free -> pro)
+        run: |
+          /tmp/macbridge license | grep -q "free" && echo "OK starts free"
+          KEY=$(go run ./cmd/mbkeygen)
+          /tmp/macbridge activate "$KEY" | grep -q "Pro" && echo "OK activated"
+          /tmp/macbridge license | grep -q "pro" && echo "OK persists"
+          # A tampered key must be rejected:
+          if /tmp/macbridge activate MB-AAAA-BBBB-CCCC-DDDD 2>/dev/null; then
+            echo "tampered key accepted!"; exit 1
+          fi
+          echo "OK rejects bad keys"
+
+      - name: CLI local status + doctor on this Mac
+        run: |
+          /tmp/macbridge status || true          # exits nonzero on a blocked bare runner — expected
+          /tmp/macbridge doctor || true
+          /tmp/macbridge doctor --signing --json > /tmp/cli-signing.json || true
+          python3 -c "import json; d=json.load(open('/tmp/cli-signing.json')); print('cli signing state:', d['summary']['state'])"
+
+      # Optional: the full product path — `macbridge install` end-to-end.
+      - name: macbridge install smoke (opt-in)
         if: ${{ inputs.run_bootstrap }}
         run: |
           brew install --cask flutter || true
-          bash bootstrap.sh --from 2 --tier vanilla || true
-          bash verify.sh || true
+          /tmp/macbridge install --from 2 --tier vanilla
+          /tmp/macbridge status
