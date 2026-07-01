@@ -111,18 +111,66 @@ Code signing requires an Apple Developer account ($99/yr) with certificates and 
 
 ```
 macbridge-bootstrap/
-├── bootstrap.sh            # Master orchestrator (~200 lines)
-├── cleanup.sh              # Session wipe (~200 lines)
-├── verify.sh               # Health checks (~200 lines)
+├── bootstrap.sh            # Master orchestrator (~260 lines)
+├── cleanup.sh              # Session wipe (~220 lines)
+├── verify.sh               # Health checks (~220 lines)
+├── healthd.sh              # Fleet health agent — cron, JSON, webhook (~180 lines)
+├── hardening.sh            # Firewall lockdown — PF rules, port isolation (~200 lines)
 ├── README.md               # This file
+├── landing/                # MacBridge landing page (Cloudflare Pages)
+│   └── index.html
 ├── lib/
-│   ├── layer0-machine.sh   # Machine reachability (~120 lines)
-│   ├── layer1-apple.sh     # Apple toolchain (~130 lines)
-│   ├── layer2-dev.sh       # Development tools (~190 lines)
-│   ├── layer3-agents.sh    # AI agents (~180 lines)
-│   └── layer4-project.sh   # Smoke test (~120 lines)
+│   ├── _utils.sh           # Shared logging, color, webhook reporting
+│   ├── layer0-machine.sh   # Machine reachability
+│   ├── layer1-apple.sh     # Apple toolchain
+│   ├── layer2-dev.sh       # Development tools
+│   ├── layer3-agents.sh    # AI agents
+│   └── layer4-project.sh   # Smoke test
 └── logs/                   # Bootstrap run logs
 ```
+
+## DevOps Toolchain
+
+Beyond provisioning, these scripts handle the operational side of running a Mac fleet:
+
+### Fleet Health Monitoring
+
+```bash
+# One-shot health check (JSON output)
+bash healthd.sh
+
+# Ship to a central dashboard every 5 minutes
+bash healthd.sh --install-cron --webhook https://dash.example.com/api/health
+
+# Continuous daemon mode
+bash healthd.sh --interval 300 --webhook https://dash.example.com/api/health
+```
+
+Health checks: disk, memory, load, Xcode, Flutter, CocoaPods, Ruby, Git, SSH keys, Node.js, all 3 agent CLIs, tmux, network, GitHub connectivity. Outputs structured JSON with machine ID, timestamp, and overall status.
+
+### Firewall Hardening
+
+```bash
+# Lock down: only SSH (22) + VNC (5900) open
+bash hardening.sh
+
+# Preview without applying
+bash hardening.sh --dry-run
+
+# Check current firewall state
+bash hardening.sh --verify
+```
+
+Configures PF (Packet Filter), enables Application Firewall + stealth mode, disables unused services (AFP, SMB, FTP, Telnet), persists rules across reboots via LaunchDaemon.
+
+### Centralized Log Shipping
+
+```bash
+# Ship bootstrap layer results to your dashboard
+bash bootstrap.sh --report-to https://dash.example.com/api/report
+```
+
+Every layer pass/fail is reported as a structured JSON event. The `_utils.sh` library provides `report_event()` and `report_to_webhook()` that all scripts can use. Set `MACBRIDGE_REPORT_URL` to enable fleet-wide telemetry.
 
 ## The 10 Lessons This Code Encodes
 
