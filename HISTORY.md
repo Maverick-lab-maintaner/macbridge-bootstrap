@@ -1741,4 +1741,137 @@ The live edge is still best-effort, not magical. That is correct for a first con
 
 ---
 
+## Act XI: The Audit Pass — CI Coverage, a Supply-Chain Catch, and Two Reversals Against Ground Truth
+
+**Context:** This pass was not a build pass. It was an audit-and-harden pass over the repo as it stood after Act X. The goal was to understand the whole system, find the real gaps, and close the highest-leverage ones. The most important outcomes were not the code that got written — they were two moments where an earlier confident claim was checked against ground truth and had to be reversed. One of those reversals caught a typosquatted dependency that had already been committed into the codebase in Act X.
+
+### The System, Read End to End
+
+The read confirmed the shape the earlier Acts built:
+
+- **Ring 1 — the product:** `bootstrap.sh` orchestrates five isolated layer processes (`bash "$script"` per layer, piped through `tee` to a per-run log). Each layer is `install → PATH-fix → verify → or-exit`. `layer4-project.sh` is the real gate: `flutter create → pub get → pod install → flutter build ios --debug --no-codesign`.
+- **The spine:** `lib/status-contract.sh` is the single JSON emitter (`contract_version: "1"`, states `ready`/`degraded`/`blocked`). `verify.sh` produces it; `doctor.sh`, `healthd.sh`, the Go `status` command, and the Cloudflare receiver all consume that one shape. `verify.sh` is load-bearing for the entire operational story.
+- **Ring 2 — control plane:** the Go CLI is an honest stub. `provision.go` literally prints "Phase 1 API integration is not implemented yet" and emits `scp` + `ssh bash bootstrap.sh` strings instead. The value is `internal/providers/providers.go`: a `Provider` interface with one `ManualProvider`, a seam staked out ahead of real cloud-Mac allocators.
+- **Ring 3 — growth:** `ops/radar/` is the listening-only lead pipeline. `engine.py` scores heuristically and gates the product mention behind score ≥70 on a non-high-risk platform, so the safety policy from `LEAD_INTEL_PACER.md` is enforced in code, not just documented.
+
+### The First Reversal: "The Binary Is Committed" Was Wrong
+
+The initial observation was that `macbridge.exe` (6.5 MB) was committed — a build artifact in source control. That was stated as fact. It was checked before being acted on:
+
+```
+git ls-files --error-unmatch macbridge.exe
+→ error: pathspec 'macbridge.exe' did not match any file(s) known to git
+```
+
+The binary is **gitignored** (`.gitignore` has `/macbridge.exe`), so it never shows in `git status` and is not tracked. The claim was retracted immediately. Lesson: a file's absence from `git status` does not mean it is committed — it can mean it is ignored. Verify tracking with `git ls-files`, not by eyeballing status output.
+
+### The Real Gap: CI Tested None of the New Code
+
+`.github/workflows/ci.yml` ran ShellCheck + `bash -n` syntax + the shell test harness, and its `paths:` trigger only fired on `**.sh` / `**.ps1`. That left **7 tracked Go files and the entire Python radar module with zero CI coverage** — no `go build`, `go vet`, `go test`, no `compileall`, no pytest. There was even an untracked `ops/radar/test_sources.py` that nothing ran.
+
+The rule applied: never wire CI to a code path without first running it locally. Local verification, before touching the workflow:
+
+```
+go build ./...   → ok      (local Go 1.26.4; go.mod declares go 1.22)
+go vet ./...     → ok
+python -m pytest ops/radar/ -q   → 2 passed
+```
+
+### The Second Reversal: `httpx2` Is a Typosquat, Not a Package
+
+This is the important one. `ops/radar/test_sources.py` and `ops/radar/sources.py` both `import httpx2`. First instinct was "typo for `httpx`." That instinct was then talked out of, incorrectly, by trusting `pip` metadata:
+
+```
+python -c "import httpx2; print(httpx2.__file__)"
+→ httpx2 OK  ...\site-packages\httpx2\__init__.py
+
+pip show httpx2
+→ Name: httpx2   Version: 2.5.0
+  Home-page: https://github.com/pydantic/httpx2
+  Summary: The next generation HTTP client.
+  Requires: anyio, httpcore2, idna, truststore
+```
+
+On that basis the package was accepted as "a real pydantic next-gen httpx" and CI was wired to install it. **That was the mistake.** Package metadata is self-reported by the author and is trivially forged. When the user pushed back — "make the correction of httpx2" — the signals were re-read as a set, and they are textbook typosquat:
+
+- the name is a **version-suffixed clone** of a popular package (`httpx` → `httpx2`)
+- the `Summary` is **httpx's own literal tagline**, "The next generation HTTP client"
+- the `Home-page` claims `pydantic/httpx2`, a repo/product that **does not exist** — pydantic does not publish an httpx
+- it depends on **`httpcore2`**, another version-suffixed clone of a real package (`httpcore`)
+- every symbol the code actually used — `Client`, `MockTransport`, `HTTPTransport`, `Timeout`, `Limits`, `HTTPStatusError`, `Request`, `Response` — is the **exact real `httpx` API**, proving the code was written for `httpx` and the `2` was corruption (most likely an agent hallucinating the import name, which `pip` then resolved to a squatter that had registered the name)
+
+The correction, verified against the genuine `httpx` already installed locally (0.28.1):
+
+```
+sed -i 's/httpx2/httpx/g' ops/radar/sources.py ops/radar/test_sources.py
+# requirements.txt: httpx2>=2.5.0  →  httpx[http2]>=0.28
+#   (the [http2] extra is required because create_hackernews_client() uses
+#    HTTPTransport(http2=True))
+rm -rf ops/radar/__pycache__          # drop stale bytecode compiled against the squatter
+python -m compileall -q ops/radar     → ok
+python -m pytest -q                   → 2 passed
+```
+
+The tests passed unchanged on real `httpx` because they only exercise `httpx.MockTransport` — pure API surface, no network — which is exactly why the API-match was such strong evidence.
+
+### What Was Actually Built This Pass
+
+- **CI `go` job:** `actions/setup-go@v5` (go 1.22, `cache-dependency-path: go.sum`) running `go build ./...`, `go vet ./...`, `go test ./...`.
+- **CI `radar` job:** `actions/setup-python@v5` (Python **3.12** — chosen because real `httpx` needs ≥3.8 and the squatter had falsely claimed ≥3.10; 3.12 is safe and cached), `working-directory: ops/radar`, `pip install -r requirements.txt`, `python -m compileall .`, `python -m pytest -q`.
+- **Widened `paths:`** filters to trigger on `**.go`, `**.py`, `go.mod`, `go.sum`, `ops/radar/requirements.txt`.
+- **`ops/radar/requirements.txt`** created, then corrected to `httpx[http2]>=0.28` + `pytest>=8.0`.
+- **`.gitignore` hardened:** added `__pycache__/`, `*.py[cod]`, `.pytest_cache/`, and `ops/radar/output/*` with a `!ops/radar/output/.gitkeep` negation so the directory persists but run artifacts do not.
+- **Committed the previously-untracked work:** the whole `ops/radar/` module, `docs/`, `AGENTS.md`, `LEAD_INTEL_PACER.md` — satisfying the `AGENTS.md` documentation rule that a milestone is not closed until the docs are landed.
+- **Agent-Reach documented as the Phase 4 collection seam** (not built): `github.com/Panniantong/Agent-Reach` is a read/search-only capability layer with ordered backends, automatic fallback, and an `agent-reach doctor` command — the same probe-and-degrade philosophy MacBridge already uses. It maps onto `sources.py` as the collection backend; the note records the adapter shape, a `--agent-reach` gating flag, fail-safe wrapping, and the preserved no-post safety boundary. Chosen: document the seam first, because Agent-Reach is not confirmed installed on target machines.
+
+### Process Notes That Bit
+
+- **Default-branch guardrail:** the repo was on `master` with a live `origin`. Work went onto `feat/ci-go-python-and-radar`, not straight to `master`.
+- **Line endings:** every `git add` emitted `LF will be replaced by CRLF` warnings — the repo normalizes on a Windows checkout; harmless, git stores LF.
+- **Shell cwd drift:** the Bash tool's working directory silently persisted into `ops/radar` after an earlier `cd`, so a later `git add ops/radar/sources.py` failed with `ops/radar/ops/radar/`. Fixed by driving git with an explicit repo root: `git -C "$R" add …`. Lesson: when a tool's cwd is stateful and you cannot see it, use `git -C <root>` (or absolute paths) instead of trusting relative paths.
+
+### Exact Toolchain Used In This Pass
+
+#### Investigation and verification
+
+- `git ls-files --error-unmatch macbridge.exe` — proved the binary was ignored, not tracked
+- `git ls-files | grep -E '\.(go|exe)$'` — enumerated tracked Go files
+- `go build ./... && go vet ./... && go test ./...` — Go control plane (go 1.26.4 local / 1.22 module)
+- `python -c "import httpx2; print(httpx2.__file__)"`, `pip show httpx2`, `importlib.metadata` Requires-Python — the metadata that first misled, then indicted
+- `python -m compileall`, `python -m pytest -q` — radar verification on real `httpx` 0.28.1
+- `python -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"` — CI YAML validation
+- `WebFetch` on `Agent-Reach/docs/README_en.md` — understood the Phase 4 backend before documenting it
+
+#### Editing and delivery
+
+- `sed -i 's/httpx2/httpx/g'` for the mechanical import correction
+- `git checkout -b feat/ci-go-python-and-radar`, `git add -A`, `git -C "$R" commit`, `git push -u origin`
+- three commits: `f52378a` (CI + committed module/docs), `a53df7c` (Agent-Reach Phase 4 docs), `49d92ca` (httpx typosquat fix)
+
+### What This Changed
+
+Before this pass:
+
+- CI proved nothing about the Go control plane or the radar module
+- the radar module, its test, and the required docs were uncommitted
+- a typosquatted `httpx2` (and transitively `httpcore2`) sat in the source and in `requirements.txt`, having entered in Act X as "the connector uses `httpx2` with the production client defaults"
+
+After this pass:
+
+- Go and Python both have real CI gates, triggered by the file types that matter
+- the module and docs are committed on a reviewable branch with clean gitignore hygiene
+- the dependency is the genuine `httpx`, and the supply-chain risk is documented with a remediation (`pip uninstall -y httpx2 httpcore2` on any machine that ran the old requirements)
+
+### The Operational Lesson
+
+This act adds two lessons, both about trusting the right source of truth:
+
+> A package's own metadata is not evidence that the package is legitimate.  
+> `pip show` reports what the author typed. Verify a dependency against signals it cannot forge: does the name clone a popular one, does the homepage actually exist, does it pull in similarly-suffixed dependencies, and does the code use an API that belongs to a *different* package. When those line up, the "2" is not a version — it is bait.
+
+> An auditor's job is to verify claims, including their own.  
+> Two confident statements this pass — "the binary is committed" and "httpx2 is a real package" — were both wrong, and both were caught only by checking against ground truth (`git ls-files`, then the metadata signals read as a set). Being willing to reverse a stated conclusion is the job, not a failure of it.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
