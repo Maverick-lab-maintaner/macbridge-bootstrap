@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
-PASS=0; FAIL=0; SKIP=0
+PASS=0; FAIL=0
 
 pass() { echo -e "  ${GREEN}✅${NC} $1"; ((PASS++)) || true; }
 fail() { echo -e "  ${RED}❌${NC} $1"; ((FAIL++)) || true; }

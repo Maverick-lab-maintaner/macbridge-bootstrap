@@ -16,7 +16,6 @@
 set -euo pipefail
 
 LAYER="Layer 0"
-LOG_FILE="${MACBRIDGE_LOG_DIR:-logs}/layer0-machine.log"
 
 # Source shared utilities if available
 if [ -f "${MACBRIDGE_LIB_DIR:-lib}/_utils.sh" ]; then
