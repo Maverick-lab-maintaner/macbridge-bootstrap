@@ -57,35 +57,44 @@ Legend: `[ ]` open · `[x]` done · `[~]` deferred (needs API/scale work) · `[!
 
 ---
 
-## What's left (running tally)
-
-**Done (5 items): W1, W2, W3, W4** (`provision.ps1`) **+ S4** (`signing-doctor.sh`).
-All implemented and validated locally (PowerShell AST parser for the `.ps1`; mocked
-`security` + fake project for the diagnoser). Neither has had a live run on a real Mac yet.
-
-**Left — nothing I can implement in code without new inputs:**
-
-| ID | Item | Why it's blocked on you |
-|----|------|-------------------------|
-| W5 | Provider API provisioning | Needs a chosen provider (Macly/VPSMAC) + API keys. Phase 1. |
-| S1 | Apple ToS due diligence | 30-min human research task. **Gates charging anyone.** |
-| S2 | Golden image **snapshot** (tooling now done) | Only the one-time Xcode GUI install + provider snapshot remain — needs a real Mac + provider console. |
-| S3 | Provider abstraction test | Needs accounts on two providers. |
-| S5 | Usage instrumentation | Needs a running beta Mac to measure; `healthd` already emits usage events to build on. |
-| S6 | Conversion measurement | Needs real beta users. |
-
 ## D. Tech-debt follow-ups (surfaced by CI, not blocking deploy)
 
 - [x] **SH1 — ShellCheck warning cleanup.** Done. Removed dead vars (`LOG_FILE` in
   layers 0–3, `NPM_GLOBAL_BIN` + `CLAUDE_INSTALLED` superseded/unused in layer3,
-  `PF_ANCHOR`, `LIB_DIR`, `SKIP`, `RED`, and hardening's redundant `PASS/FAIL` re-init
-  that `_utils.sh` already provides), and annotated the one `SC2207` in `migrate.sh`
-  with a reason (kept the portable `IFS`/`()` form — `mapfile` is bash 4+, but macOS
-  ships bash 3.2). Gate restored to `severity: warning`.
+  `PF_ANCHOR`, `LIB_DIR`, `SKIP`, `RED`, two orphaned `SCRIPT_DIR`, and hardening's
+  redundant `PASS/FAIL` re-init that `_utils.sh` already provides), and annotated the
+  one `SC2207` in `migrate.sh` with a reason (kept the portable `IFS`/`()` form —
+  `mapfile` is bash 4+, but macOS ships bash 3.2). CI gate restored to `severity: warning`.
 
 ---
 
-**The single most important next step is S2 (golden image)** — it delivers the "excellent
-UX" and validates the "0 minutes" promise. S1 (Apple ToS) is the cheapest and must precede
-any charging. Sections A and S4 are now off your plate; everything remaining needs a real
-Mac, a provider, or beta users.
+## Status
+
+Everything that is **code** is done and merged to `master` across three green PRs.
+Everything **left needs the real world** — a Mac, a provider, or beta users.
+
+### Done (merged)
+
+| PR | Scope | Items |
+|----|-------|-------|
+| [#1](https://github.com/Maverick-lab-maintaner/macbridge-bootstrap/pull/1) | Audit hardening | CI Go+Python jobs; `httpx2` typosquat → real `httpx`; committed radar module + docs; `provision.ps1` W1–W4; **S4** signing diagnoser (+ CLI `doctor --signing`); `install-skills.sh` runtime bug |
+| [#2](https://github.com/Maverick-lab-maintaner/macbridge-bootstrap/pull/2) | **S2 tooling** | `readiness.sh` (Ready screen), `workspace-setup.sh` (prepared studio), `golden-image.sh` (build/verify/manifest) |
+| [#3](https://github.com/Maverick-lab-maintaner/macbridge-bootstrap/pull/3) | **SH1** | cleared all ShellCheck warnings; gate enforced at `severity: warning` |
+
+Done item IDs: **W1, W2, W3, W4, S4, S2 (tooling), SH1.** CI is green and now genuinely
+enforced. Caveat: `provision.ps1`, `signing-doctor.sh`, and the S2 scripts are validated
+locally (AST parser, mocked contracts, `--dry-run`) but **not yet run on a real Mac**.
+
+### Left — all blocked on real-world inputs (no more code I can write)
+
+| ID | Item | Blocked on |
+|----|------|-----------|
+| S1 | Apple ToS due diligence | 30-min human research. **Gates charging anyone — do this first.** |
+| S2 (finish) | Golden image **snapshot** | Install Xcode via GUI once + snapshot via provider console. `golden-image.sh build` guides it. |
+| W5 / S3 | Provider API + multi-provider test | A chosen provider (Macly/VPSMAC) + API keys. |
+| S5 | Usage instrumentation | A running beta Mac to measure (`healthd` already emits usage events to build on). |
+| S6 | Conversion measurement | Real beta users. |
+
+**Next real-world move: S1 (Apple ToS)** — cheapest, and it gates everything commercial.
+When you have a Mac provisioned, the live `golden-image.sh build` → snapshot flow is the
+one that turns the S2 tooling into an actual image.

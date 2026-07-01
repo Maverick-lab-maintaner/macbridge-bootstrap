@@ -1940,4 +1940,104 @@ After: the studio and the readiness screen are scripts; the image is reproducibl
 
 ---
 
+## Act XIII: Deployment Readiness — Windows Bring-Up, the Signing Diagnoser, and Reading the Business Before Touching Code
+
+**Context:** Acts XIII–XIV backfill two threads that ran *alongside* Acts XI–XII and were completed across PRs #1 and #3. The chronology inside each act is exact; they are grouped by theme so the lessons hold together. This act covers the "make it deployable" thread: harden the Windows entry point, build the signing diagnoser, and — first — read the business honestly enough to know what "deploy" even means.
+
+### Reading the business before writing code
+
+Before touching `provision.ps1`, the KnowledgeBase was read end to end (`HONEST_ASSESSMENT.md`, `MVP_BUILD_PLAN.md`, `ONBOARDING_ENVIRONMENT_STRATEGY.md`, `COST_BENEFIT_RISK_ANALYSIS.md`). The single most useful output was a distinction the word "deploy" was hiding:
+
+- **Deploy A** — hand-provision 5–10 beta users, give them SSH/DeskIn credentials. The Windows operator tooling is *good enough to run manually*.
+- **Deploy B** — a customer signs up on a site and gets a Mac automatically. The whole self-service chain (billing, provider API, snapshot automation, email) is **unbuilt** — Phase 1/2 by the project's own plan.
+
+Everything built in this act is scoped to Deploy A. Naming that split prevented building the wrong thing. A second read-only finding: the margin model rests entirely on an unvalidated "10 users per Mac" assumption that also *conflicts* with the "your data persists" promise (you cannot both keep a warm per-user Mac and time-share it 10 ways). That tension was recorded, not coded around.
+
+### The five `provision.ps1` fixes (W1–W4 + a guard)
+
+- **W1 — stop shipping junk.** `scp -r $BootstrapDir` copied `.git/`, `logs/`, and `macbridge.exe` — a 6.5 MB **Windows** binary — onto the Mac. Fix: stage top-level `*.sh` + `lib/` into a temp dir and copy only that.
+- **W2 — survive a dropped SSH.** A 35-minute bootstrap over a raw SSH channel aborts on one network blip. Fix: launch it detached with `nohup` writing a live log (`bootstrap-live.log`) and, on exit, its return code to `bootstrap.rc`; stream with `tail -F`; read the real exit code afterward. Added `-Resume` (re-attach an in-progress run) and `-FromLayer N` (pass `--from` to bootstrap). The subtle part was **quoting**: a PowerShell double-quoted string with backtick-escaped `` `$? `` / `` `$! `` / `` `$TP `` so those reach the Mac's shell literally, while `$RemoteDir` / `$Tier` interpolate in PowerShell. The generated remote command was printed and inspected before trusting it.
+- **W3 — preflight OpenSSH.** Fail early if `ssh`/`scp` are absent from PATH.
+- **W4 — UTF-8 `session.json`.** Windows PowerShell 5.1's `Set-Content` defaults to UTF-16; any UTF-8 reader chokes. Pass `-Encoding utf8`. Plus a guard rejecting a `RemoteDir` without `/` before any remote `rm -rf`.
+
+Validation was **the PowerShell AST parser** (`[System.Management.Automation.Language.Parser]::ParseFile`) plus printing the generated remote command strings — there was no Mac to live-test against, and that limit was stated rather than hidden.
+
+### The signing diagnoser (S4) — a boundary encoded as a script
+
+`HONEST_ASSESSMENT.md` Gap 2 draws a hard line: MacBridge *diagnoses* signing but never creates certificates or touches the Apple Developer account. `signing-doctor.sh` is that line as code — read-only:
+
+- `security find-identity -v -p codesigning` (valid) vs `security find-identity -p codesigning` (all) → an expired/invalid count from the difference
+- provisioning profiles in both the legacy `~/Library/MobileDevice/...` and the Xcode 16 `~/Library/Developer/Xcode/UserData/...` locations
+- with `--project`: `PRODUCT_BUNDLE_IDENTIFIER` + `DEVELOPMENT_TEAM` from `project.pbxproj`, and whether the project's team has a matching identity in the keychain
+
+It reuses `lib/status-contract.sh` so `--json` speaks the same shape as `verify.sh`/`doctor.sh`, and it prints Apple-guide links per issue.
+
+**The bug in the test, not the code:** validating with a mocked `security` produced a formatting glitch — the identity-name `sed` used `[0-9A-F]+` for the hash, and the mock's fake hash contained `G/H/I/J` (not hex), so one line printed raw. Real Apple hashes are hex, so the code was fine, but the class was widened to `[0-9A-Fa-f]+` for robustness. Lesson: unrealistic mock data can manufacture a "bug" in correct code — make fixtures resemble reality.
+
+Then it was wired into the Go CLI: `macbridge doctor --signing [--project P] [--json]`, factored into `buildDoctorCommand()` with a `shellQuote()` helper for safe remote paths — both covered by **`status_test.go`, the first Go unit tests in the repo**, so the CI `go test` job finally exercised real logic. `signing-doctor.sh` is a top-level `*.sh`, so W1's staging already ships it to the Mac.
+
+### Process note: the shell that moved under me
+
+The Bash tool's working directory silently persisted into `ops/radar` after an earlier `cd`, so a later `git add ops/radar/sources.py` failed with `ops/radar/ops/radar/`. Fix: drive git with an explicit root — `git -C "$R" ...` — instead of trusting relative paths against an unseen cwd. That became the default for every later git call.
+
+### The operational lesson
+
+> Read the business before writing the code, and let it tell you what *not* to build.
+> Naming the Deploy A / Deploy B split, and the persistence-vs-multitenancy tension, saved more effort than any script — you cannot harden your way out of building the wrong thing.
+
+---
+
+## Act XIV: The Quality Gate That Was Red All Along — a Parse Bug, a Severity Dial, and Warnings That Hid Behind an Error
+
+**Context:** This thread began the moment the first pull request was opened and ended two PRs later. It is the story of a CI gate that had been failing silently for weeks, the single real bug hiding inside the noise, and a two-round cleanup that taught more about ShellCheck's behaviour than about the code.
+
+### Opening a PR surfaced weeks of red
+
+The audit added `go` and `radar` CI jobs and the branch went green on them — but **ShellCheck failed**. It was not the new code: `signing-doctor.sh` produced *zero* findings. `gh run list --workflow "MacBridge CI" --branch master` showed `completed failure` on the last three master pushes. The gate had been red for weeks, invisible because the workflow's `paths:` filter only ran it when `.sh`/`.ps1` files changed — but when it *did* run, `ludeeus/action-shellcheck` scans the **whole repo**, so it failed regardless of the diff.
+
+### One real bug in a sea of style noise
+
+Of ~14 findings, exactly one was error-level. `install-skills.sh:248`:
+
+```bash
+TOTAL_SKILLS=$(( ${#ALL_SKILLS[@]} + ( [ "$TIER" = "agent" ] && echo "${#AGENT_SKILLS[@]}" || echo 0 ) ))
+```
+
+That is not valid arithmetic — `( [ test ] && echo N || echo 0 )` is command syntax inside a `$(( ))` expression (`SC1072`/`SC1073`). It fails at runtime, not just in the linter. Fixed by computing the agent count with a normal conditional, then adding. The rest were `SC2034` (unused variable) and one `SC2207` (word-splitting) — style, not bugs.
+
+### The severity dial as a deliberate, reversible decision
+
+To unblock the merge without silently weakening the gate, ShellCheck was set to `severity: error` (genuine bugs block; style warnings advisory), the real bug was fixed, and the warning cleanup was **tracked as SH1** in `shortlist.md` rather than hidden. The decision was documented in the workflow comment and the commit. That is the honest shape of a temporary compromise: named, reversible, and scheduled.
+
+### SH1: clearing the warnings, and two ShellCheck behaviours worth knowing
+
+Restoring `severity: warning` meant every warning had to go. Distinguishing dead code from cross-file false positives required grepping actual usage:
+
+- `LOG_FILE` (layers 0–3): set for `_utils.sh`'s `log()`, but the layers **never call `log()`** — genuinely dead. Removed. (Layer 4 keeps its own `LOG_FILE`; it uses it in an error message.)
+- `NPM_GLOBAL_BIN`, `CLAUDE_INSTALLED` (layer3): set, never read — superseded/dead. Removed.
+- hardening's `PASS=0; FAIL=0`: a redundant re-init of counters `_utils.sh` already defines and increments via `ok()`/`fail()`. Removed.
+- `PF_ANCHOR`, `LIB_DIR`, `SKIP`, `RED`: unused. Removed.
+
+**Portability over "modernizing":** the `SC2207` in `migrate.sh` suggests `mapfile`. But `mapfile` is bash 4+ and **macOS ships bash 3.2** — switching would break the target. The correct fix was to keep the portable `IFS`/`()` form and annotate `# shellcheck disable=SC2207` with that reason. A lint "fix" that breaks the runtime is not a fix.
+
+Then two behaviours made the cleanup take **two rounds**:
+
+1. **Removing a variable can orphan its dependency.** Deleting the dead `LIB_DIR` from `tmux-launch.sh` left `SCRIPT_DIR` — whose *only* consumer was `LIB_DIR` — newly unused. A fresh `SC2034` appeared where there was none. CI caught it.
+2. **A parse error masks everything after it.** ShellCheck stops analysing a file at the first `SC1072`. So `install-skills.sh`'s unused `SCRIPT_DIR` had been *invisible* until the line-248 arithmetic bug was fixed — fixing an error **revealed** a warning it had been hiding. Expected once you know the rule; alarming if you don't.
+
+With no local `shellcheck` binary, **CI was the authoritative check** — which is exactly why restoring `severity: warning` mattered: the gate now fails on precisely this class of thing, so the two-round correction was driven by real feedback, not guesswork.
+
+### Exact toolchain used across this thread
+
+- `gh run list --workflow ... --branch master` (proved the gate was red for weeks); `gh run view --job <id> --log` (extracted the exact findings); `gh pr checks <n>` (authoritative pass/fail)
+- `grep -n` for each flagged variable's real usage (dead vs cross-file); `bash -n` on every edited script
+- `git -C "$R"` for all commits (shell cwd drift); squash-merges via `gh pr merge --squash --delete-branch`
+
+### The operational lesson
+
+> A quality gate you do not run is a gate that is already red.
+> A whole-repo linter behind a path filter, a parse error masking later warnings, and a "modernization" that breaks the runtime are three different ways to be quietly wrong. The fix for all three is the same: make the gate real, run it on everything, and let its feedback — not your assumptions — drive the cleanup.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
