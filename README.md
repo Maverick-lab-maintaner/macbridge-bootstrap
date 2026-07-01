@@ -1,7 +1,7 @@
 # MacBridge Bootstrap
 
-> **The product isn't the Mac. The bootstrap script is the product.**
-> The Mac is interchangeable commodity hardware. The knowledge encoded in these scripts — the provisioning sequence, the verification at every layer, the 10 Phase 0 lessons — is what MacBridge sells.
+> **The product isn't the Mac. The product is the continuously verified development workspace** — bootstrap, doctor, recovery, readiness, signing, AI-agent readiness, updates, and the golden image, together.
+> The Mac is interchangeable commodity hardware (cloud *or* a physical Mac you already own). The knowledge encoded in these scripts — the provisioning sequence, the verification at every layer, the doctor rules that grow over time — is what MacBridge sells. See [`docs/BUSINESS_MODELS.md`](docs/BUSINESS_MODELS.md) for the software-first (Studio) direction.
 
 ## What This Is
 
