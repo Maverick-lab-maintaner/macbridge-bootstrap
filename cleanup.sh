@@ -127,7 +127,7 @@ run_clean "Project directories" '
     rm -rf "$HOME/shiftflowr"* 2>/dev/null
     rm -rf "$HOME/test_app"* 2>/dev/null
     # Clean up any leftover smoke test directories
-    rm -rf /tmp/macbridge-smoke-test-* 2>/dev/null
+    rm -rf /tmp/macbridge_smoke_test_* /tmp/macbridge-smoke-test-* 2>/dev/null
     true
 '
 
