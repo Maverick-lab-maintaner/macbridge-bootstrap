@@ -246,12 +246,22 @@ The project grew from:
 - into a lead-intel and reply-assist module
 - into a golden-image builder that codifies the "prepared studio" and shrinks the
   manual work to its irreducible core (install Xcode once, snapshot once)
+- into a hardened Windows bring-up (a 35-minute bootstrap that survives a dropped SSH)
+  and a read-only signing diagnoser that guides without ever touching the Apple account
 
 The common rule across all of it is the same:
 
 > if a step cannot be verified, it is not finished
 
-And a second rule earned building the golden image:
+And three more rules, each earned from a real twist:
 
 > some of the product is un-codeable — so make the code shrink the manual part to
 > exactly its core, and make everything around it reproducible and verifiable
+> *(building the golden image)*
+
+> read the business before writing the code, and let it tell you what not to build
+> *(the Deploy A / Deploy B split, and the persistence-vs-multitenancy tension)*
+
+> a quality gate you do not run is a gate that is already red
+> *(ShellCheck was failing on master for weeks behind a path filter; a parse error
+> was masking the warnings that hid behind it)*
