@@ -112,12 +112,16 @@ if [ "$JSON_MODE" = false ]; then
     echo -e "${BOLD}Apple Toolchain:${NC}"
 fi
 
+# NOTE: no `| head -1` inside check commands — under `set -o pipefail`, head
+# closing the pipe early sends the tool SIGPIPE (exit 141) and records a false
+# FAIL (seen live: xcodebuild "NOT FOUND" on a Mac where it worked). record_check
+# already truncates output to the first line.
 record_check "xcode_app" "Xcode installed" "[ -d /Applications/Xcode.app ] && echo installed" "critical" "installed"
-record_check "xcodebuild" "xcodebuild" "xcodebuild -version | head -1" "critical" "available"
+record_check "xcodebuild" "xcodebuild" "xcodebuild -version" "critical" "available"
 record_check "xcode_clt" "Command Line Tools" "xcode-select -p" "critical" "configured"
 
 if [ "$QUICK_MODE" = false ]; then
-    record_check "simulator" "iOS Simulator runtime" "xcrun simctl list runtimes | grep iOS | head -1" "critical" "installed"
+    record_check "simulator" "iOS Simulator runtime" "xcrun simctl list runtimes | grep iOS" "critical" "installed"
 elif [ "$JSON_MODE" = false ]; then
     printf "  ${YELLOW}SKIP${NC} %-35s %s\n" "iOS Simulator runtime" "(quick mode)"
 fi
@@ -127,21 +131,21 @@ if [ "$JSON_MODE" = false ]; then
     echo -e "${BOLD}Development Tools:${NC}"
 fi
 
-record_check "homebrew" "Homebrew" "brew --version | head -1" "critical" "installed"
-record_check "git" "Git" "git --version | head -1" "critical" "installed"
-record_check "gh_cli" "GitHub CLI" "gh --version | head -1" "advisory" "installed"
+record_check "homebrew" "Homebrew" "brew --version" "critical" "installed"
+record_check "git" "Git" "git --version" "critical" "installed"
+record_check "gh_cli" "GitHub CLI" "gh --version" "advisory" "installed"
 record_check "ssh_key" "SSH key (ed25519)" "[ -f \$HOME/.ssh/id_ed25519 ] && echo present" "advisory" "present"
-record_check "flutter" "Flutter SDK" "flutter --version | head -1" "critical" "installed"
+record_check "flutter" "Flutter SDK" "flutter --version" "critical" "installed"
 record_version_check "ruby" "Ruby" "ruby --version" "3.0" "critical"
-record_check "cocoapods" "CocoaPods" "pod --version | head -1" "critical" "installed"
+record_check "cocoapods" "CocoaPods" "pod --version" "critical" "installed"
 
 if [ "$JSON_MODE" = false ]; then
     echo ""
     echo -e "${BOLD}AI Agents:${NC}"
 fi
 
-record_check "node" "Node.js" "node --version | head -1" "critical" "installed"
-record_check "npm" "npm" "npm --version | head -1" "critical" "installed"
+record_check "node" "Node.js" "node --version" "critical" "installed"
+record_check "npm" "npm" "npm --version" "critical" "installed"
 
 if [ "$QUICK_MODE" = false ]; then
     record_check "claude" "Claude Code" "which claude" "advisory" "installed"
@@ -151,7 +155,7 @@ elif [ "$JSON_MODE" = false ]; then
     printf "  ${YELLOW}SKIP${NC} %-35s %s\n" "Agent CLIs" "(quick mode)"
 fi
 
-record_check "tmux" "tmux" "tmux -V | head -1" "advisory" "installed"
+record_check "tmux" "tmux" "tmux -V" "advisory" "installed"
 
 if [ "$QUICK_MODE" = false ]; then
     if [ "$JSON_MODE" = false ]; then

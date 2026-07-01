@@ -118,7 +118,9 @@ fi
 # ── Layer execution ────────────────────────────────────────────────────────
 
 # Track results for summary
-declare -A LAYER_STATUS
+# Indexed array (layer numbers 0-4), NOT `declare -A`: associative arrays are
+# bash 4+, and macOS ships bash 3.2 — `declare -A` crashes bootstrap on the Mac.
+LAYER_STATUS=()
 TOTAL_START=$(date +%s)
 
 run_layer() {

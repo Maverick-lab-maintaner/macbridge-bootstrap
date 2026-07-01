@@ -311,13 +311,25 @@ macbridge doctor --host <ip> --signing --json                # machine-readable
 
 ## Related Docs
 
+**In this repo** (start at the [docs index](docs/README.md)):
+
+- [docs/BUSINESS_MODELS.md](docs/BUSINESS_MODELS.md) — the software-first (Studio) decision and why
+- [docs/PRICING_STRATEGY.md](docs/PRICING_STRATEGY.md) — compliant tiers + unit economics
+- [docs/APPLE_LICENSE_COMPLIANCE.md](docs/APPLE_LICENSE_COMPLIANCE.md) — what Apple's macOS SLA permits and forbids
+- [docs/PERSONAS.md](docs/PERSONAS.md) — the three target personas under software-first
+- [docs/STUDIO_PACKAGING.md](docs/STUDIO_PACKAGING.md) — the build path to ship the software product
+- [docs/GO_TO_MARKET.md](docs/GO_TO_MARKET.md) — the Radar lead funnel into the compliant tiers
+- [docs/LOCAL_TESTING.md](docs/LOCAL_TESTING.md) — validate for $0 on WSL + free GitHub macOS runners
+- [docs/macbridge-story.md](docs/macbridge-story.md) — learning-oriented chronology of the repo, failures, and fixes
+- [HISTORY.md](HISTORY.md) — the exact build chronicle · [shortlist.md](shortlist.md) — what's done and what's left
+
+**In the KnowledgeBase** (local, not in this repo):
+
 - [MACBRIDGE_PLAN.md](../Obsidian/KnowledgeBase/MacBridge/MACBRIDGE_PLAN.md) — Full 5-pillar build plan + business plan
 - [MVP_BUILD_PLAN.md](../Obsidian/KnowledgeBase/MacBridge/MVP_BUILD_PLAN.md) — Exact build order + networking architecture
 - [LESSONS_LEARNED.md](../Obsidian/KnowledgeBase/MacBridge/LESSONS_LEARNED.md) — 10 Phase 0 provisioning lessons
 - [PHASE0_FIRST_IOS_BUILD.md](../Obsidian/KnowledgeBase/MacBridge/PHASE0_FIRST_IOS_BUILD.md) — First iOS build milestone
 - [POST_PHASE0_SYNTHESIS.md](../Obsidian/KnowledgeBase/MacBridge/POST_PHASE0_SYNTHESIS.md) — Strategy shift post-provisioning
-
-- [docs/macbridge-story.md](docs/macbridge-story.md) - Learning-oriented chronology of the repo, failures, and fixes
 ---
 
 **Maverix Labs** | Phase 0-validated | June 2026

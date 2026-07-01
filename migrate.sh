@@ -51,39 +51,42 @@ done
 
 # In production, this would query an API or read from a central registry.
 # For now, versions are declared here. Bump when you rebuild the golden image.
-declare -A GOLDEN_IMAGES
-GOLDEN_IMAGES["v1"]="macOS 15 Sequoia | Xcode 26.6 | iOS 26.5 Sim | Flutter 3.44.4 | CocoaPods 1.16.2 | Ruby 4.x | Node 22"
-GOLDEN_IMAGES["v2"]="macOS 15 Sequoia | Xcode 26.6 | iOS 26.5 Sim | Flutter 3.44.4 | CocoaPods 1.16.2 | Ruby 4.x | Node 22 | harden.sh applied"
+# Parallel indexed arrays, NOT `declare -A`: associative arrays are bash 4+,
+# and macOS ships bash 3.2. Keep GOLDEN_VERSIONS in release order — the list
+# renders in declaration order.
+GOLDEN_VERSIONS=("v1" "v2")
+GOLDEN_DESCRIPTIONS=(
+    "macOS 15 Sequoia | Xcode 26.6 | iOS 26.5 Sim | Flutter 3.44.4 | CocoaPods 1.16.2 | Ruby 4.x | Node 22"
+    "macOS 15 Sequoia | Xcode 26.6 | iOS 26.5 Sim | Flutter 3.44.4 | CocoaPods 1.16.2 | Ruby 4.x | Node 22 | harden.sh applied"
+)
+
+golden_desc() {
+    local target="$1" i
+    for ((i = 0; i < ${#GOLDEN_VERSIONS[@]}; i++)); do
+        if [ "${GOLDEN_VERSIONS[$i]}" = "$target" ]; then
+            echo "${GOLDEN_DESCRIPTIONS[$i]}"
+            return 0
+        fi
+    done
+    echo "unknown version"
+}
 
 LATEST_VERSION="v2"
 
 # ── Lists available versions ───────────────────────────────────────────────
 
 list_versions() {
-    local versions=()
     echo ""
     echo -e "${BOLD}Available Golden Images:${NC}"
     echo ""
 
     local ver
-    for ver in "${!GOLDEN_IMAGES[@]}"; do
-        versions+=("$ver")
-    done
-
-    # shellcheck disable=SC2207  # portable to macOS bash 3.2; mapfile is bash 4+
-    IFS=$'\n' versions=($(printf '%s\n' "${versions[@]}" | perl -e 'print sort {
-        my ($an) = $a =~ /(\d+)/;
-        my ($bn) = $b =~ /(\d+)/;
-        ($an // 0) <=> ($bn // 0) || $a cmp $b
-    } <STDIN>'))
-    unset IFS
-
-    for ver in "${versions[@]}"; do
+    for ver in "${GOLDEN_VERSIONS[@]}"; do
         local marker=""
         [ "$ver" = "$LATEST_VERSION" ] && marker=" ${GREEN}(latest)${NC}"
         [ "$ver" = "$(get_current_version)" ] && marker="$marker ${CYAN}(current)${NC}"
         echo -e "  ${BOLD}${ver}${NC}$marker"
-        echo -e "    ${GOLDEN_IMAGES[$ver]}"
+        echo -e "    $(golden_desc "$ver")"
         echo ""
     done
 }
@@ -135,7 +138,7 @@ check_version() {
     echo -e "  ${YELLOW}⚠️${NC}  Update available: ${current} → ${LATEST_VERSION}"
     echo ""
     echo -e "  ${BOLD}Changes in ${LATEST_VERSION}:${NC}"
-    echo -e "  ${GOLDEN_IMAGES[$LATEST_VERSION]}"
+    echo -e "  $(golden_desc "$LATEST_VERSION")"
     echo ""
 
     if [ "$MODE" = "interactive" ]; then

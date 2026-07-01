@@ -103,6 +103,19 @@ locally (AST parser, mocked contracts, `--dry-run`) but **not yet run on a real 
 | S5 | Usage instrumentation | A running beta Mac to measure (`healthd` already emits usage events to build on). |
 | S6 | Conversion measurement | Real beta users. |
 
-**Next real-world move: S1 (Apple ToS)** — cheapest, and it gates everything commercial.
-When you have a Mac provisioned, the live `golden-image.sh build` → snapshot flow is the
-one that turns the S2 tooling into an actual image.
+**Update (2026-07-01, post software-first):** S1 is done and repriced (S7 →
+`docs/BUSINESS_MODELS.md`: ship **Studio** first). That reframing also reprioritizes the
+leftovers: **S3 (provider-agnosticism)** is now *more* valuable (Studio must run identically
+on any Mac), while **W5 (provider API)** is deferred to the Managed tier.
+
+**The "never run on a real Mac" caveat is retired for the read-only tooling.** The
+`macos-smoke.yml` workflow ran the suite on a real GitHub `macos-latest` runner (run
+28544716383): `verify`/`doctor`/`signing-doctor`/`readiness`/`golden-image manifest` all
+executed on real macOS and emitted valid status contracts — correctly diagnosing a bare
+runner as `blocked` (no Flutter, no signing identity). Still untested on a real Mac:
+`bootstrap.sh` end-to-end (smoke opt-in exists), `workspace-setup.sh` login behaviour,
+`provision.ps1` against a live host.
+
+**Next moves:** decide the S7 tier structure (business), then Studio packaging P0
+(`docs/STUDIO_PACKAGING.md`). When you have a Mac with GUI access, `golden-image.sh build`
+→ snapshot turns the S2 tooling into an actual image.
