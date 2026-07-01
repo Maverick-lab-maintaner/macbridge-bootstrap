@@ -40,6 +40,10 @@ while [[ $# -gt 0 ]]; do
         --skip-github) SKIP_GITHUB=true; shift ;;
         --repo) REPO_URL="$2"; shift 2 ;;
         --tier) TIER="$2"; shift 2 ;;
+        --help|-h)
+            echo "Usage: bash welcome.sh [--skip-github] [--repo git@github.com:user/repo.git] [--tier vanilla|agent]"
+            exit 0
+            ;;
         *) shift ;;
     esac
 done
@@ -126,7 +130,7 @@ if [ "$TIER" = "vanilla" ]; then
     echo -e "${BOLD}[2/4] AI Provider Setup${NC}"
     echo ""
     echo -e "  ${YELLOW}⏭️${NC}  Skipped — vanilla tier does not include AI agents."
-    echo -e "  ${CYAN}→${NC}   Upgrade to agent tier ($39/mo) for Claude Code, OpenCode, and Codex."
+    echo -e "  ${CYAN}→${NC}   Upgrade to agent tier (\$39/mo) for Claude Code, OpenCode, and Codex."
     echo ""
 else
     echo -e "${BOLD}[2/4] AI Provider Setup${NC}"
@@ -267,7 +271,7 @@ fi
 
 if [ "$TIER" = "vanilla" ]; then
     echo -e "  ${GREEN}✅${NC} Vanilla tier — Flutter iOS toolchain only"
-    echo -e "  ${CYAN}💡${NC}  Upgrade to agent tier ($39/mo): pre-installed AI agents + skill library"
+    echo -e "  ${CYAN}💡${NC}  Upgrade to agent tier (\$39/mo): pre-installed AI agents + skill library"
     echo ""
 fi
 

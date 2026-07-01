@@ -74,8 +74,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --from N      Start from layer N (0-4)"
-            echo "  --tier TYPE   Provisioning tier: vanilla (no agents, $19/mo) or agent (full, $39/mo)"
-            echo "  --report-to URL  Ship layer results to central endpoint (POST JSON)"
+            echo "  --tier TYPE   Provisioning tier: vanilla (no agents, \$19/mo) or agent (full, \$39/mo)"
             echo "  --report-to URL  Ship layer results to central endpoint (POST JSON)"
             echo "  --help        Show this help"
             exit 0

@@ -187,7 +187,6 @@ run_clean "OpenCode config" '
 # ── Codex config ───────────────────────────────────────────────────────────
 run_clean "Codex CLI config" '
     rm -f "$HOME/.codex.json" 2>/dev/null
-    rm -rf "$HOME/.codex" 2>/dev/null
     rm -rf "$HOME/.config/codex" 2>/dev/null
     rm -rf "$HOME/.cache/codex" 2>/dev/null
     true
