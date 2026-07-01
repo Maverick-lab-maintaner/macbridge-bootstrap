@@ -10,6 +10,11 @@ on:
         description: "Also install Flutter and run bootstrap --from 2 (slower)"
         type: boolean
         default: false
+      tier:
+        description: "Bootstrap tier for the install smoke"
+        type: choice
+        options: [vanilla, agent]
+        default: vanilla
 
 jobs:
   smoke:
@@ -85,5 +90,20 @@ jobs:
         if: ${{ inputs.run_bootstrap }}
         run: |
           brew install --cask flutter || true
-          /tmp/macbridge install --from 2 --tier vanilla
+          /tmp/macbridge install --from 2 --tier "${{ inputs.tier }}" --agents all
           /tmp/macbridge status
+
+      # Agent tier only: the three advertised agents must actually resolve —
+      # this is the "type claude/opencode/codex and it works" promise. Strict
+      # on purpose: if a package name is wrong, we want red here, not on a
+      # customer's Mac.
+      - name: agents actually installed (agent tier)
+        if: ${{ inputs.run_bootstrap && inputs.tier == 'agent' }}
+        run: |
+          for a in claude opencode codex; do
+            if command -v "$a" >/dev/null 2>&1; then
+              echo "OK  $a -> $(command -v "$a")"
+            else
+              echo "MISSING: $a did not install"; exit 1
+            fi
+          done

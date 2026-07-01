@@ -2357,4 +2357,51 @@ Before: a proven toolchain nobody could install, and a conversion rate of 0% by 
 
 ---
 
+## Act XXII: The Agent Tier — a Choice TUI, Two Hallucinated Packages, and the First Agent-Tier MAC READY
+
+**Context:** The founder pushed back on a UX gap before the paid real-Mac test: the onboarding strategy always said *"choose your AI agent"*, but `macbridge install` force-installed all three. Building the choice surfaced something worse — and fixing it produced the first proof that the product's core differentiator actually works.
+
+### The selection, end to end
+
+One choice, threaded through all three layers of the product:
+
+- **CLI TUI** (`agents.go`): when tier is `agent`, `--agents` is unset, and stdin is a terminal, `macbridge install` presents a picker — *1 Claude Code / 2 OpenCode / 3 Codex / a=all / n=none* — with the BYO-keys billing note right in the prompt. The parsing lives in a pure `parseAgentSelection()` (numbers, names, mixed separators, dedupe; 21 unit-test cases), and CI/non-TTY paths default to all so automation never blocks on a prompt.
+- **`bootstrap.sh --agents LIST`** → exports `MACBRIDGE_AGENTS`.
+- **Layer 3** gates each agent behind a `wants()` case-match, printing *"Skipping X (not selected)"* — Node and tmux always install because they serve the whole workspace.
+
+### The twist: two of the three advertised agents could never have installed
+
+Reading Layer 3 to wire the gates exposed two latent bugs sitting in the install lines since the layer was written:
+
+1. **OpenCode:** `npm install -g @ oh-my-opencode/cli` — a **space after the `@`**, which npm parses as two arguments; and the fallbacks (`opencode`, `@anthropic-ai/opencode`) are wrong-org names. The real package is **`opencode-ai`** (sst/opencode), with `brew install sst/tap/opencode` as fallback.
+2. **Codex:** `pip3 install codex-cli` / `@anthropic-ai/codex-cli` — hallucinated names (Codex is OpenAI's). The real package is **`@openai/codex`**.
+
+The same failure genus as Act XI's `httpx2`: **hallucinated package names, this time in install scripts** — worse than a typosquat in one way, because nothing crashes at build time; the layer only `warn`s, so every agent-tier customer would have received a Mac where `opencode` and `codex` silently didn't exist. The "type claude and your agent has a Mac" promise was one-third true.
+
+### Proving the fix instead of asserting it
+
+"Fixed in code" had been the trap before (Act XIX: the class fixed in one file flaked in another). So the smoke workflow gained a `tier` input and a **strict agent-resolution step** — `command -v claude opencode codex` must all succeed or the run is red — and was dispatched with `tier=agent`. The result, on a real Apple runner:
+
+```
+✅ Claude Code installed   ✅ OpenCode installed   ✅ Codex CLI installed
+✅ Layer 3 passed (15s)
+║  🟢 MAC READY — agent tier ║
+OK  claude   -> /opt/homebrew/bin/claude
+OK  opencode -> /opt/homebrew/bin/opencode
+OK  codex    -> /opt/homebrew/bin/codex
+```
+
+**The first agent-tier MAC READY in the project's history.** The differentiator the whole vibecoder thesis rests on — agents natively installed on a verified Mac — is now demonstrated, not described.
+
+### The rehearsal script
+
+`docs/REAL_MAC_TEST_SCRIPT.md` turns the upcoming $15 Macly day into a 7-phase checklist — first live `brew install` of the formula, the agent picker, the "type `claude`" moment (rated 1–10), the prepared-studio login, the phone/tmux reconnect, the golden-image snapshot, cleanup + usage timings — ending in a promise scorecard whose exit rule decides when LemonSqueezy flips on. Its one behavioral rule: *you are a customer, not the founder; every hesitation is a finding.*
+
+### The operational lesson
+
+> Install lines are claims about the outside world — verify the package name against the real registry the way you'd verify a quote against the source.
+> Two of three agents were hallucinated packages that only ever `warn`ed. The strict CI step exists so that class of quiet lie turns red before a customer sees it; "fixed" only counted when a real Mac said `OK codex ->` out loud.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
