@@ -62,27 +62,182 @@ var provisionCmd = &cobra.Command{
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check Mac environment health",
-	Long:  `Checks the health of a provisioned Mac by running verify.sh remotely.`,
+	Short: "Check Mac environment health with a TUI dashboard",
+	Long:  `Runs verify.sh remotely and renders a terminal dashboard with box-drawn ANSI output.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if macHost == "" {
 			fmt.Println("Error: --host is required")
 			return
 		}
 
-		fmt.Printf("Checking Mac at %s...\n", macHost)
-		sshCmd := exec.Command("ssh",
+		// Fetch health data via SSH
+		raw, err := exec.Command("ssh",
 			"-o", "StrictHostKeyChecking=accept-new",
 			"-o", "ConnectTimeout=10",
 			fmt.Sprintf("%s@%s", macUser, macHost),
-			"cd ~/macbridge-bootstrap && bash verify.sh --quick",
-		)
-		sshCmd.Stdout = os.Stdout
-		sshCmd.Stderr = os.Stderr
-		if err := sshCmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Health check failed: %v\n", err)
+			"cd ~/macbridge-bootstrap && bash healthd.sh 2>/dev/null",
+		).Output()
+
+		if err != nil {
+			// Fallback: run verify.sh --quick
+			verifyCmd := exec.Command("ssh",
+				"-o", "StrictHostKeyChecking=accept-new",
+				"-o", "ConnectTimeout=10",
+				fmt.Sprintf("%s@%s", macUser, macHost),
+				"cd ~/macbridge-bootstrap && bash verify.sh --quick",
+			)
+			verifyCmd.Stdout = os.Stdout
+			verifyCmd.Stderr = os.Stderr
+			if err := verifyCmd.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "Health check failed: %v\n", err)
+			}
+			return
 		}
+
+		// Parse JSON and render TUI
+		renderTUI(string(raw), macHost)
 	},
+}
+
+func renderTUI(rawJSON string, host string) {
+	// Simple ANSI parser — extract key fields from healthd JSON output
+	// Falls back gracefully if JSON parse fails
+	extract := func(key string) string {
+		// Crude grep — works without a JSON parser dependency
+		grep := fmt.Sprintf(`"%s":"([^"]*)"`, key)
+		for _, line := range splitLines(rawJSON) {
+			if matches(line, grep) {
+				return extractValue(line)
+			}
+		}
+		return "—"
+	}
+
+	extractNested := func(parent, key string) string {
+		inParent := false
+		for _, line := range splitLines(rawJSON) {
+			if contains(line, `"`+parent+`":`) {
+				inParent = true
+				continue
+			}
+			if inParent && contains(line, `"`+key+`":`) {
+				return extractValue(line)
+			}
+		}
+		return "—"
+	}
+
+	flVer := extractNested("flutter", "value")
+	xcVer := extractNested("xcodebuild", "value")
+	rubyVer := extractNested("ruby", "value")
+	podVer := extractNested("cocoapods", "value")
+	nodeVer := extractNested("node", "value")
+	disk := extractNested("disk", "value")
+	overall := extract("overall")
+	failed := extract("failed_count")
+	hostname := extract("hostname")
+	machineID := extract("machine_id")
+
+	statusIcon := "🟢"
+	statusText := "healthy"
+	if overall == "degraded" {
+		statusIcon = "🔴"
+		statusText = "degraded"
+	}
+
+	// Agents
+	claude := "❌"
+	opencode := "❌"
+	codex := "❌"
+	if extractNested("claude", "status") == "PASS" { claude = "✅" }
+	if extractNested("opencode", "status") == "PASS" { opencode = "✅" }
+	if extractNested("codex", "status") == "PASS" { codex = "✅" }
+
+	fmt.Println()
+	fmt.Printf("  ┌─────────────────────────────────────────────────┐\n")
+	fmt.Printf("  │  %s Mac:    %-12s (%s)          │\n", statusIcon, machineID, statusText)
+	fmt.Printf("  │  SSH:    %-30s           │\n", fmt.Sprintf("%s@%s", macUser, host))
+	fmt.Printf("  │  Host:   %-30s           │\n", hostname)
+	fmt.Printf("  │                                                 │\n")
+	fmt.Printf("  │  Flutter:    %-12s %s                        │\n", flVer, checkMark(flVer))
+	fmt.Printf("  │  Xcode:      %-12s %s                        │\n", xcVer, checkMark(xcVer))
+	fmt.Printf("  │  Ruby:       %-12s %s                        │\n", rubyVer, checkMark(rubyVer))
+	fmt.Printf("  │  CocoaPods:  %-12s %s                        │\n", podVer, checkMark(podVer))
+	fmt.Printf("  │  Node.js:    %-12s %s                        │\n", nodeVer, checkMark(nodeVer))
+	fmt.Printf("  │  Disk:       %-12s %s                        │\n", disk, checkMark(disk))
+	fmt.Printf("  │                                                 │\n")
+	fmt.Printf("  │  Claude:  %s  OpenCode: %s  Codex: %s                    │\n", claude, opencode, codex)
+	fmt.Printf("  │                                                 │\n")
+	fmt.Printf("  │  Health:  %s (%s failed checks)                  │\n", statusText, failed)
+	fmt.Printf("  └─────────────────────────────────────────────────┘\n")
+	fmt.Println()
+}
+
+func checkMark(val string) string {
+	if val == "" || val == "—" || val == "not found" || val == "missing" {
+		return "❌"
+	}
+	return "✅"
+}
+
+func splitLines(s string) []string {
+	var lines []string
+	current := ""
+	for _, ch := range s {
+		if ch == '\n' {
+			lines = append(lines, current)
+			current = ""
+		} else {
+			current += string(ch)
+		}
+	}
+	if current != "" {
+		lines = append(lines, current)
+	}
+	return lines
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func matches(s, pattern string) bool {
+	// Simple pattern match: "key":"value"
+	// Pattern format: "key":"([^"]*)"
+	return contains(s, pattern[:len(pattern)-len(`([^"]*)"`)]) || contains(s, pattern[1:len(pattern)-len(`([^"]*)"`)])
+}
+
+func extractValue(line string) string {
+	// Extract value from "key":"value" pair
+	start := -1
+	for i, ch := range line {
+		if ch == '"' {
+			if start == -1 {
+				start = i
+			}
+		}
+	}
+	// Find last quoted value
+	lastQuote := -1
+	for i := len(line) - 1; i >= 0; i-- {
+		if line[i] == '"' {
+			if lastQuote == -1 {
+				lastQuote = i
+			} else {
+				return line[i+1 : lastQuote]
+			}
+		}
+	}
+	return ""
 }
 
 var sshCmd = &cobra.Command{
