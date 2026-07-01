@@ -8,7 +8,7 @@ import socket
 import xml.etree.ElementTree as element_tree
 from pathlib import Path
 
-import httpx2
+import httpx
 
 from models import RawLead, dedupe, now_iso
 
@@ -72,35 +72,35 @@ def build_hackernews_queries(queries: dict[str, list[str]]) -> list[str]:
     return dedupe(bucket_queries)
 
 
-def create_hackernews_client() -> httpx2.Client:
-    transport = httpx2.HTTPTransport(
+def create_hackernews_client() -> httpx.Client:
+    transport = httpx.HTTPTransport(
         http2=True,
         retries=3,
-        limits=httpx2.Limits(max_connections=200, max_keepalive_connections=40, keepalive_expiry=30.0),
+        limits=httpx.Limits(max_connections=200, max_keepalive_connections=40, keepalive_expiry=30.0),
         socket_options=[(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)],
     )
     hooks = {
         "request": [log_request],
         "response": [log_response],
     }
-    return httpx2.Client(
+    return httpx.Client(
         transport=transport,
-        timeout=httpx2.Timeout(connect=5.0, read=30.0, write=10.0, pool=10.0),
+        timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=10.0),
         follow_redirects=True,
         headers={"User-Agent": "MacBridge Radar/1.0"},
         event_hooks=hooks,
     )
 
 
-def log_request(request: httpx2.Request) -> None:
+def log_request(request: httpx.Request) -> None:
     LOGGER.info("HN request %s", request.url)
 
 
-def log_response(response: httpx2.Response) -> None:
+def log_response(response: httpx.Response) -> None:
     LOGGER.info("HN response %s %s", response.status_code, response.request.url)
 
 
-def fetch_hackernews_query(client: httpx2.Client, query: str, limit: int) -> list[RawLead]:
+def fetch_hackernews_query(client: httpx.Client, query: str, limit: int) -> list[RawLead]:
     try:
         response = client.get(
             REDDIT_SEARCH_URL,
@@ -112,7 +112,7 @@ def fetch_hackernews_query(client: httpx2.Client, query: str, limit: int) -> lis
             },
         )
         response.raise_for_status()
-    except httpx2.HTTPStatusError as exc:
+    except httpx.HTTPStatusError as exc:
         LOGGER.warning("Reddit search failed for %s: %s", query, exc.response.status_code)
         return []
     root = element_tree.fromstring(response.text.encode("utf-8"))
@@ -153,18 +153,18 @@ def first_text(hit: dict[str, str | list[str]], keys: tuple[str, ...]) -> str:
     return ""
 
 
-def fetch_feed_safe(client: httpx2.Client, url: str) -> list[RawLead]:
+def fetch_feed_safe(client: httpx.Client, url: str) -> list[RawLead]:
     try:
         return fetch_feed(client, url)
-    except (httpx2.HTTPError, element_tree.ParseError):
+    except (httpx.HTTPError, element_tree.ParseError):
         return []
 
 
-def fetch_feed(client: httpx2.Client, url: str) -> list[RawLead]:
+def fetch_feed(client: httpx.Client, url: str) -> list[RawLead]:
     try:
         response = client.get(url)
         response.raise_for_status()
-    except httpx2.HTTPStatusError as exc:
+    except httpx.HTTPStatusError as exc:
         LOGGER.warning("Feed fetch failed for %s: %s", url, exc.response.status_code)
         return []
     root = element_tree.fromstring(response.text.encode("utf-8"))

@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-import httpx2
+import httpx
 
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
@@ -15,13 +15,13 @@ import sources  # noqa: E402
 
 
 def test_fetch_hackernews_query_maps_hits_to_raw_leads() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/search.rss"
         assert request.url.params["q"] == "flutter ios build windows"
         assert request.url.params["sort"] == "new"
         assert request.url.params["t"] == "month"
         assert request.url.params["limit"] == "2"
-        return httpx2.Response(
+        return httpx.Response(
             200,
             text=(
                 "<?xml version='1.0' encoding='UTF-8'?>"
@@ -36,8 +36,8 @@ def test_fetch_hackernews_query_maps_hits_to_raw_leads() -> None:
             ),
         )
 
-    transport = httpx2.MockTransport(handler)
-    with httpx2.Client(transport=transport) as client:
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as client:
         items = sources.fetch_hackernews_query(client, "flutter ios build windows", limit=2)
 
     assert len(items) == 1
