@@ -114,8 +114,11 @@ macbridge-bootstrap/
 ├── bootstrap.sh            # Master orchestrator (~260 lines)
 ├── cleanup.sh              # Session wipe (~220 lines)
 ├── verify.sh               # Health checks (~220 lines)
-├── healthd.sh              # Fleet health agent — cron, JSON, webhook (~180 lines)
-├── hardening.sh            # Firewall lockdown — PF rules, port isolation (~200 lines)
+├── welcome.sh              # Stage 3: Welcome Wizard — first-login setup (~200 lines)
+├── healthd.sh              # Fleet health agent — cron, JSON, webhook (~190 lines)
+├── hardening.sh            # Firewall lockdown — PF rules, port isolation (~220 lines)
+├── migrate.sh              # Golden image version check + opt-in upgrade (~180 lines)
+├── provision.ps1           # Windows → Mac provisioning (PowerShell, ~160 lines)
 ├── README.md               # This file
 ├── landing/                # MacBridge landing page (Cloudflare Pages)
 │   └── index.html
@@ -128,6 +131,47 @@ macbridge-bootstrap/
 │   └── layer4-project.sh   # Smoke test
 └── logs/                   # Bootstrap run logs
 ```
+
+## Provisioning Pipeline (3 Stages)
+
+```
+Stage 1: Golden Image  →  Manual (GUI once, snapshot)
+Stage 2: Bootstrap     →  bash bootstrap.sh          (this repo)
+Stage 3: Welcome Wizard →  bash welcome.sh           (this repo)
+```
+
+### Stage 3: Welcome Wizard
+
+Runs on first login after bootstrap. Turns a verified Mac into a working dev environment.
+
+```bash
+bash welcome.sh                                          # Full interactive wizard
+bash welcome.sh --skip-github                            # GitHub already configured
+bash welcome.sh --repo git@github.com:user/repo.git      # Auto-clone project
+```
+
+Guides through: GitHub Device Flow (`gh auth login`), Claude/OpenCode/Codex API key setup, project clone, tmux session creation.
+
+### Golden Image Migration
+
+```bash
+bash migrate.sh                    # Check version, offer upgrade if available
+bash migrate.sh --check            # Version check only
+bash migrate.sh --list             # List available golden images
+sudo bash migrate.sh --set-version v1  # Tag current Mac
+```
+
+Never force-updates. Preserves user data. Backs up configs before upgrade. Opt-in only.
+
+### Windows Provisioning (PowerShell)
+
+```bash
+.\provision.ps1 -MacHost 203.0.113.47
+.\provision.ps1 -MacHost 203.0.113.47 -Welcome -Hardening
+.\provision.ps1 -MacHost 203.0.113.47 -ReportTo https://dash.example.com/api/report
+```
+
+SCPs bootstrap scripts to Mac, executes remotely, streams output to Windows terminal. Saves session info to `~/.macbridge/session.json` for reconnection.
 
 ## DevOps Toolchain
 
