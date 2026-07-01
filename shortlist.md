@@ -132,11 +132,18 @@ checksums match). Five beta keys generated.
 
 **Queued next (deliberately parked until the product is user-tested):**
 
-- [ ] **P1a — LemonSqueezy checkout + key delivery.** Wire a LemonSqueezy product for
-  Studio ($19/mo); on purchase webhook → generate a key (mbkeygen logic) → deliver in the
-  purchase email. LemonSqueezy's merchant dashboard covers customers/payments/refunds —
-  build no admin UI. This is the piece that converts Radar leads to revenue with zero
-  frontend. **Do after the first real-Mac UX test validates the experience.**
+- [~] **P1a — LemonSqueezy checkout + key delivery. BUILT DARK, not wired.**
+  `commerce/lemonsqueezy-webhook.js` (HMAC-verified, idempotent per order, refuses all
+  traffic without a signing secret) + `commerce/keygen.mjs` (JS port of the Go key math,
+  **byte-exact** — pinned by `test-keygen.mjs` vectors and cross-validated both directions).
+  Activation is a 30-min runbook in `commerce/README.md` (LemonSqueezy product → secret →
+  deploy → test purchase → wire email delivery). **Do after the real-Mac UX test.**
+- [~] **Customer Dashboard V1. BUILT DARK, demo mode.** `landing/dashboard/index.html`
+  (noindex, unlinked from nav) renders every spec state — SLA gate, provisioning, ready,
+  degraded, blocked, tooling-tier — from embedded sample payloads in the site design
+  system; `dashboard/customer-api.js` is the read-composition worker (contract + lease +
+  SLA + license from KV, 24h floor computed server-side), dark-guarded. Wire when the
+  first Managed customer or ~10 active beta users exist.
 - [ ] **UX test on a real Mac (the $15 Macly day).** The real customer path end-to-end:
   `brew install` from the tap → `macbridge install` → `workspace-setup.sh` login studio →
   `golden-image.sh build` → provider snapshot (finishes S2). This one rental validates the
