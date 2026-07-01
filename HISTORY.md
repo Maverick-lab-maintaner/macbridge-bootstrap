@@ -778,6 +778,174 @@ Total: 20 commits, 36 files, ~6,800 lines
 
 ---
 
+## Act VI: Architecture Hardening — Shared Operational Contract
+
+**Source:** Post-implementation audit. The repo had the right primitives — layered bootstrap, independent verification, fleet health shipping, a thin Go CLI. The missing architecture was not "more scripts." It was a **shared operational contract** across those scripts and a small seam for provider orchestration.
+
+### Status Contract (`lib/status-contract.sh`)
+
+**The problem:** verify.sh, healthd.sh, and the Go CLI each had their own output format. The dashboard assumed binary healthy/degraded. The CLI had a crude string-matching JSON parser. Every tool spoke a different language.
+
+**The fix:** A canonical JSON schema (`contract_version: "1"`) shared by every tool in the system.
+
+```
+Before:
+  verify.sh  →  custom text output
+  healthd.sh →  similar-but-different JSON
+  Go CLI     →  crude string-matching grep
+  Dashboard  →  assumed binary healthy/degraded
+
+After:
+  verify.sh  ──┐
+  healthd.sh ──┼──▶  status-contract.sh  ──▶  Unified JSON schema
+  doctor.sh  ──┘      (contract_version: "1")
+                │
+                ├──▶  Go CLI (encoding/json struct parsing)
+                └──▶  Dashboard (three-state model)
+```
+
+**The three-state model:**
+| State | Condition | Meaning |
+|-------|-----------|---------|
+| `ready` | Zero critical failures | Environment production-ready |
+| `degraded` | Non-critical failures or warnings | Works but needs attention |
+| `blocked` | ≥1 critical failure | Cannot be used until repaired |
+
+**The schema includes:**
+- `provider` — name, kind, host (for multi-provider fleet tracking)
+- `telemetry` — source, session ID, usage log path
+- `summary` — state, checks_passed/failed/warn, critical_failed, next_action
+- `checks` — per-check: label, status (PASS/WARN/FAIL), severity, value
+
+**The severity model:** Each check has a severity — `critical` (blocks readiness), `advisory` (informational only). Critical failures trigger `blocked` state. Advisory warnings trigger `degraded`.
+
+### Doctor + Rules (`doctor.sh` + `lib/doctor-rules.json`)
+
+**The problem:** verify.sh told you WHAT failed. You had to know WHY and HOW to fix it. That knowledge lived in your head and the 10 Phase 0 lessons in markdown. A new operator facing a failed check had no path to resolution.
+
+**The fix:** Institutional knowledge made executable. `doctor.sh` takes verify.sh JSON output, cross-references 15+ rules in `doctor-rules.json`, and outputs specific remediation steps per failing check.
+
+```
+$ bash doctor.sh
+
+🔴 disk_50gb — Disk headroom is too low for reliable builds
+   → Run `bash cleanup.sh --dry-run` to see reclaimable user data.
+   → Run `bash cleanup.sh --force` if the machine can be reset.
+   → Increase the VM disk allocation if cleanup is not enough.
+
+🔴 xcode_app — Xcode is missing from the machine image
+   → Install Xcode in the golden image through the GUI once.
+   → Re-run `bash bootstrap.sh --from 1` after installation completes.
+
+⚠️  github_ssh — GitHub SSH is not configured
+   → Run `bash welcome.sh` to authenticate with GitHub Device Flow.
+   → Or manually: gh auth login --hostname github.com --web.
+```
+
+**Rule structure:**
+```json
+{
+  "id": "disk_50gb",
+  "title": "Disk headroom is too low for reliable builds",
+  "severity": "critical",
+  "fix": [
+    "Run `bash cleanup.sh --dry-run` to see reclaimable user data.",
+    "Run `bash cleanup.sh --force` if the machine can be reset.",
+    "Increase the VM disk allocation if cleanup is not enough."
+  ]
+}
+```
+
+**The decision:** Rules are JSON, not embedded in shell. Operators can add new rules without touching code. As new failure modes are discovered, the rules file grows. The 10 Phase 0 lessons become a living, executable knowledge base.
+
+### Go CLI Restructure
+
+**The problem:** `commands.go` was 172 lines in one monolithic file. The status command had a crude string-matching JSON parser — fragile, untyped, no error handling for malformed output. The provision command had hard-coded copy-paste instructions.
+
+**The fix:** Proper Go package architecture.
+
+| Before | After |
+|--------|-------|
+| `commands.go` (172 lines) | 5 files, clean separation |
+| Crude string-matching grep | `encoding/json` struct parsing |
+| Hard-coded SSH instructions | Provider interface + `BuildProvisionPlan()` |
+
+**New file structure:**
+```
+cmd/macbridge/commands/
+├── root.go          — Cobra root + global flags (--host, --user, --key, --tier, --report-to)
+├── provision.go     — Provider-backed provisioning plan
+├── status.go        — Real JSON parsing + status TUI + doctor subcommand
+├── remote.go        — SSH helpers (runSSHCommand, runSSHOutput, hostRequired)
+└── lifecycle.go     — Stop, cleanup, resume lifecycle operations
+```
+
+**Status command upgrade:**
+```go
+// Before: fragile string matching
+extract := func(key string) string { ... crude grep ... }
+
+// After: proper Go structs
+type statusReport struct {
+    MachineID   string                 `json:"machine_id"`
+    Overall     string                 `json:"overall"`
+    FailedCount int                    `json:"failed_count"`
+    Checks      map[string]statusCheck `json:"checks"`
+    Summary     struct {
+        State      string `json:"state"`
+        ChecksWarn int    `json:"checks_warn"`
+    } `json:"summary"`
+    Provider    struct { Name string; Kind string } `json:"provider"`
+}
+var report statusReport
+json.Unmarshal(raw, &report)
+```
+
+**New `macbridge doctor` subcommand:** Remote invocation of `doctor.sh` via SSH. `macbridge doctor --host 203.0.113.47` runs the full remediation pipeline on the target Mac.
+
+### Provider Abstraction (`internal/providers/`)
+
+**The problem:** The original `provision` command baked in manual SSH assumptions — "scp this, ssh that, run bootstrap." No way to swap cloud Mac providers. No API integration seam.
+
+**The fix:** A provider interface with `BuildProvisionPlan()`. The CLI calls `providers.DefaultProvider()` which returns a plan with `CopyCommand`, `BootstrapCommand`, `Notes`, and `ProviderName`. Today it returns manual SSH instructions. Tomorrow, a `MaclyProvider` or `VPSMACProvider` implements the same interface — the CLI doesn't change.
+
+```go
+// Today — manual provider
+plan := providers.DefaultProvider().BuildProvisionPlan(providers.ProvisionRequest{...})
+// plan.CopyCommand    → "scp -r . admin@203.0.113.47:~/macbridge-bootstrap"
+// plan.BootstrapCommand → "ssh admin@203.0.113.47 'cd ~/macbridge-bootstrap && bash bootstrap.sh'"
+
+// Tomorrow — API provider
+plan := providers.MaclyProvider(apiKey).BuildProvisionPlan(...)
+// plan.CopyCommand    → "" (API handles upload)
+// plan.BootstrapCommand → "" (API triggers bootstrap server-side)
+```
+
+### Telemetry + Dashboard Upgrade
+
+**Before:** `healthd.sh` shipped JSON to a webhook. If the webhook was down or network failed, the event was lost. No local record.
+
+**After:** Dual-write telemetry. Events ship to webhook AND append to a local NDJSON log (`logs/usage-events.ndjson`). Durable, replayable. Operators can audit a Mac's health history even if the central dashboard was unreachable during an incident.
+
+**Dashboard upgrade:** The Cloudflare Worker's fleet view now understands the three-state model. Machines are `ready` 🟢, `degraded` 🟡, or `blocked` 🔴 — not just the old binary `healthy`/`degraded`. A machine with a missing Xcode is `blocked`, not merely `degraded`. This distinction drives operational priority.
+
+### What This Changed
+
+The repo is still shell-first — the correct choice for this stage. The improvement is that it now has a **clear control plane**: verification is canonical, status semantics are explicit, remediation is encoded, telemetry is durable locally, and the Go CLI has an actual provider seam instead of hard-coded provisioning copy.
+
+```
+Before Act VI:
+  Scripts that worked independently but didn't share a language.
+  Knowledge lived in markdown and operator experience.
+
+After Act VI:
+  Scripts that share a contract. Knowledge lives in executable rules.
+  Three explicit states. Provider abstraction. Durable telemetry.
+  The same architecture that Railway and Render built at this stage.
+```
+
+---
+
 ## What's Not Here (And Why)
 
 | Component | Status | Why Not |
