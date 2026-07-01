@@ -268,6 +268,7 @@ bash cleanup.sh --dry-run    # Preview without changes
 - [PHASE0_FIRST_IOS_BUILD.md](../Obsidian/KnowledgeBase/MacBridge/PHASE0_FIRST_IOS_BUILD.md) — First iOS build milestone
 - [POST_PHASE0_SYNTHESIS.md](../Obsidian/KnowledgeBase/MacBridge/POST_PHASE0_SYNTHESIS.md) — Strategy shift post-provisioning
 
+- [docs/macbridge-story.md](docs/macbridge-story.md) - Learning-oriented chronology of the repo, failures, and fixes
 ---
 
 **Maverix Labs** | Phase 0-validated | June 2026

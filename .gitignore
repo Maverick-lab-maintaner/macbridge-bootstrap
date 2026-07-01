@@ -9,3 +9,12 @@ logs/*
 # Go build artifacts (binary only, not source directory)
 /macbridge
 /macbridge.exe
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Radar generated outputs — keep the directory, ignore run artifacts
+ops/radar/output/*
+!ops/radar/output/.gitkeep

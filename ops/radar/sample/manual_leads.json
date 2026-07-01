@@ -1,0 +1,26 @@
+[
+  {
+    "platform": "reddit",
+    "author": "flutterfounder42",
+    "url": "https://example.com/reddit/flutter-testflight",
+    "title": "Need to ship Flutter app to TestFlight from Windows",
+    "text": "I need to get my Flutter app to TestFlight from Windows by Friday. Codemagic is too expensive and I need an alternative this week.",
+    "captured_at": "2026-07-01T12:00:00Z"
+  },
+  {
+    "platform": "x",
+    "author": "indiehackerdev",
+    "url": "https://example.com/x/cloud-mac-pain",
+    "title": "Cloud Mac setup is painful",
+    "text": "Build ios without mac sounded easy until Xcode, CocoaPods and Ruby started fighting me. Need this fast for a client launch.",
+    "captured_at": "2026-07-01T12:05:00Z"
+  },
+  {
+    "platform": "github",
+    "author": "ossuser",
+    "url": "https://example.com/github/issue/123",
+    "title": "Question about Flutter iOS signing",
+    "text": "What is the difference between simulator and device builds for Flutter on macOS?",
+    "captured_at": "2026-07-01T12:10:00Z"
+  }
+]

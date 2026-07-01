@@ -1101,4 +1101,644 @@ After this pass:
 
 ---
 
+## Act VIII: Windows Bring-Up, LSP Recovery, and the Difference Between Architecture and Runtime
+
+**Context:** After the architectural work was documented in `c10834a` and the repo looked structurally stronger on paper, a more practical question followed:
+
+> Is the Windows side actually ready before testing on a real Mac?
+
+That question forced a second kind of validation. The problem was no longer "is the design coherent?" It was:
+
+1. does the Windows operator surface really execute,
+2. do the local toolchains actually resolve under Codex/OpenCode,
+3. does the repo behave the same way under shell, Go, PowerShell, and LSP scrutiny,
+4. and do the docs claim more than the implementation currently proves?
+
+This pass exposed one of the most important lessons in the whole project:
+
+> A repo can have the right architecture and still fail at the last inch because of transport, path, quoting, or shell-runtime details.
+
+### The First Failure: LSP Was "Configured" but Not Actually Usable
+
+The first runtime failure was not in repo code. It was in the Codex-side MCP configuration.
+
+Codex would not start:
+
+```text
+Error loading config.toml: invalid transport
+in `mcp_servers.lsp`
+```
+
+**The cause:** a top-level `[mcp_servers.lsp]` block had been added with only:
+
+```toml
+[mcp_servers.lsp]
+startup_timeout_sec = 120
+```
+
+That looked harmless, but an MCP server definition without a `command` or `url` is invalid. The whole Codex config failed to load.
+
+**The fix happened in two stages:**
+
+1. first, complete the block into a valid server definition so Codex could boot again;
+2. then remove the brittle version-pinned plugin path and replace it with a stable wrapper command.
+
+The durable fix was:
+
+```toml
+[mcp_servers.lsp]
+command = "C:\\Users\\MAVERIX\\.codex\\bin\\codex-lsp-latest.cmd"
+startup_timeout_sec = 120
+```
+
+That wrapper script dynamically resolved the newest installed OMO plugin version instead of hardcoding `4.13.0`.
+
+**What this taught:** a timeout override is not free-standing configuration. If you surface a top-level MCP server, you own the full transport definition.
+
+### The Second Failure: `gopls` Was Installed But Still "Missing"
+
+After the transport was fixed, `mcp__lsp.status` came back, but reported:
+
+```text
+- gopls: missing
+```
+
+even though `gopls.exe` was present and runnable.
+
+**The actual state on disk:**
+- `C:\Program Files\Go\bin\go.exe` existed
+- `C:\Users\MAVERIX\tools\go\bin\go.exe` existed
+- `C:\Users\MAVERIX\go\bin\gopls.exe` existed
+- `gopls version` returned `golang.org/x/tools/gopls v0.22.0`
+
+**The problem was not installation.** It was discovery by the already-running LSP daemon.
+
+The daemon had started with an older process `PATH`, so the shell and the MCP did not agree about what "installed" meant.
+
+**The fix:** add a user-level LSP client override:
+
+```json
+{
+  "lsp": {
+    "gopls": {
+      "command": [
+        "C:\\Users\\MAVERIX\\go\\bin\\gopls.exe"
+      ],
+      "extensions": [
+        ".go"
+      ]
+    }
+  }
+}
+```
+
+in:
+
+```text
+C:\Users\MAVERIX\.codex\lsp-client.json
+```
+
+After that, `mcp__lsp.status` reported:
+
+```text
+- gopls: installed; source=user; extensions=.go
+```
+
+and later showed an active `gopls` client.
+
+**What this taught:** installation state and daemon-resolution state are separate systems. When an agent says "installed," that is not proof the live daemon can execute the binary.
+
+### The Third Failure: LSP Warnings Looked Like Go Errors But Weren't
+
+Once `gopls` was active, diagnostics on files like:
+
+- `cmd/macbridge/commands/provision.go`
+- `internal/providers/providers.go`
+
+showed:
+
+```text
+warning[go list] at 1:8: No active builds contain ...
+```
+
+That warning first looked like a repo-level breakage. It was not.
+
+Direct toolchain verification from the module root showed:
+
+```powershell
+C:\Program Files\Go\bin\go.exe list ./...
+C:\Program Files\Go\bin\go.exe test ./...
+```
+
+Both passed.
+
+**Conclusion:** the repo was valid; the warning was a `gopls` workspace-root integration quirk in this environment, not a broken module.
+
+This distinction mattered because it prevented a fake fix. The right response was to record the warning as non-blocking, not to change valid Go code to satisfy a transport artifact.
+
+### The Fourth Failure: The Real Windows Blocker Was `provision.ps1`
+
+The architectural audit of the Windows side surfaced the real operator-facing failure:
+
+```text
+provision.ps1 does not parse as valid PowerShell
+```
+
+The initial parser errors pointed at:
+
+```powershell
+& ssh -t @sshOpts "$User@$MacHost" "cd $RemoteDir && bash welcome.sh"
+```
+
+This looked like one bug. It was actually several overlapping bugs.
+
+#### Failure mode 1: Invalid splatting form
+
+PowerShell did not accept:
+
+```powershell
+& ssh -t @sshOpts ...
+```
+
+The `-t` flag and the splatted array had to be composed into one argument array.
+
+#### Failure mode 2: Interpolation ambiguity
+
+Strings like:
+
+```powershell
+"$User@$MacHost"
+```
+
+caused parse trouble under this host. They had to be normalized to explicit formatting or array-built arguments.
+
+#### Failure mode 3: Literal `&&` in command strings
+
+This was the least obvious one. Even apparently quoted strings containing:
+
+```text
+&&
+```
+
+were rejected by the local PowerShell parser in the way the script had been written. This affected lines such as:
+
+```powershell
+"cd $RemoteDir && bash welcome.sh"
+```
+
+and even user-facing summary strings showing example commands.
+
+#### Failure mode 4: mojibake/encoding contamination
+
+The file contained mixed Unicode/mojibake output from prior editing:
+- smart punctuation
+- box-drawing glyphs
+- arrows
+- emoji-like banner characters
+
+That made line-by-line repair harder because parse errors did not always point at the true semantic issue.
+
+### The Real Fix: Rewrite the Windows Bridge Cleanly
+
+After several targeted repairs exposed new parser issues, the correct move was not another micro-patch. It was a clean rewrite of `provision.ps1` into a plain ASCII PowerShell script with:
+
+- consistent `admin` default user
+- argument-array based `ssh` and `scp` helpers
+- explicit runtime failure paths
+- session persistence to `~/.macbridge/session.json`
+- optional `-Welcome`, `-Hardening`, and `-ReportTo`
+- remote commands using `;` instead of `&&`
+
+The final structure used helper functions:
+
+```powershell
+function Run-Ssh { ... }
+function Run-Scp { ... }
+function Fail-Step { ... }
+```
+
+and built all remote commands through those helpers instead of inline ad hoc invocations.
+
+**Verification surface changed too:**
+- before: the script failed at parse time
+- after: it parsed cleanly and reached runtime validation, failing correctly on a fake key with:
+
+```text
+SSH key not found: C:\definitely-missing-key
+```
+
+That is a much more meaningful failure. It proves the script is executable and now fails only on real operator input.
+
+### The Fifth Failure: Windows and Go Were Drifting Apart
+
+The repo now had two provisioning surfaces:
+
+1. `provision.ps1`
+2. `macbridge provision`
+
+Those surfaces were not aligned.
+
+#### Drift 1: default SSH user
+
+PowerShell used the local Windows username by default.
+
+The Go CLI used:
+
+```go
+RootCmd.PersistentFlags().StringVar(&macUser, "user", "admin", ...)
+```
+
+That mismatch meant the same operator could be told two different defaults depending on entrypoint.
+
+**Fix:** standardize the PowerShell script on `admin`.
+
+#### Drift 2: `--report-to` was exposed but not propagated
+
+The Go CLI had:
+
+```go
+RootCmd.PersistentFlags().StringVar(&reportTo, "report-to", "", ...)
+```
+
+but the manual provider plan ignored it.
+
+That meant the CLI advertised centralized reporting while only the PowerShell path actually supported it.
+
+**Fix:** extend `ProvisionRequest` with:
+
+```go
+ReportTo string
+```
+
+and thread it into the provider plan so the remote bootstrap command became:
+
+```text
+ssh ... 'cd ~/macbridge-bootstrap; bash bootstrap.sh --tier agent --report-to "https://..."'
+```
+
+instead of appending `--report-to` outside the remote quoted command, which would have been semantically wrong.
+
+### The Sixth Failure: "Docs Done" and "Runtime Done" Were Not the Same Milestone
+
+At this point the repo had two adjacent commits with very different meanings:
+
+| Commit | Meaning |
+|------|------|
+| `c10834a` | The control-plane architecture is documented and explained |
+| `022d75f` | The implementation, Windows bridge, provider seam, and public/docs surfaces are actually wired together |
+
+This distinction matters.
+
+The earlier commit was not "wrong." It accurately described the architecture. But it was ahead of the runtime proof for one critical surface: Windows provisioning.
+
+The next commit was the one that made the docs true in practice.
+
+### Exact Toolchain Used In This Pass
+
+This pass was instructive because it was not solved by one language or one tool. It required cross-checking the same behavior through multiple surfaces.
+
+#### Shell and script verification
+
+- `bash -n bootstrap.sh verify.sh doctor.sh migrate.sh healthd.sh hardening.sh welcome.sh cleanup.sh lib/*.sh`
+- `verify.sh --json --quick`
+- `doctor.sh`
+
+#### Go verification
+
+- `C:\Program Files\Go\bin\go.exe version`
+- `C:\Program Files\Go\bin\go.exe list ./...`
+- `C:\Program Files\Go\bin\go.exe test ./...`
+- `gofmt.exe -w ...`
+
+#### PowerShell verification
+
+- PowerShell parser checks through `System.Management.Automation.Language.Parser`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File provision.ps1 ...`
+
+#### LSP and editor-surface verification
+
+- `mcp__lsp.status`
+- `mcp__lsp.diagnostics`
+- `typescript-language-server`
+- `bash-language-server`
+- `@biomejs/biome`
+- `gopls`
+
+#### Git and release verification
+
+- `git status`
+- `git diff --staged --stat`
+- `git show --stat`
+- `git push origin master`
+- GitHub combined status check on the relevant commit
+
+### What This Changed
+
+Before this pass:
+- the repo had a credible architecture but an unreliable Windows operator surface,
+- `gopls` was on disk but not visible to the live LSP daemon,
+- LSP warnings were easy to misread as code failure,
+- and the two provisioning entrypoints were not behaviorally aligned.
+
+After this pass:
+- the Codex LSP transport was valid again,
+- Go LSP resolution was explicit and stable,
+- PowerShell provisioning was parser-safe and runtime-safe,
+- the Go manual-provider path propagated reporting correctly,
+- the Windows default user was consistent,
+- and the difference between architectural truth and runtime truth was recorded explicitly.
+
+### The Operational Lesson
+
+This act sharpened a final lesson that belongs next to the original 10 Phase 0 lessons:
+
+> In infrastructure products, the last 5 percent is usually transport, path, quoting, encoding, and daemon state.  
+> That 5 percent is not polish. It is the product becoming real.
+
+---
+
+## Act IX: MacBridge Radar, PACER Framing, and Turning Outbound Discovery Into an Internal Operator Tool
+
+**Context:** After the Windows control plane was stabilized, the next question was not provisioning. It was growth:
+
+> Can MacBridge detect people who already have the exact pain it solves, and help draft the right reply without becoming a spam bot?
+
+That question produced a new subproject: `ops/radar/`.
+
+The work moved through three distinct phases:
+
+1. a PACER-based strategy note so the idea could be reasoned about clearly,
+2. a Phase 1 listening-only prototype,
+3. a Phase 2/3 review workflow with drafts and a local board.
+
+### PACER Was the Right Lens
+
+The PACER doc became the first learning artifact for this work:
+
+- `LEAD_INTEL_PACER.md`
+
+It explained the idea in beginner language and separated the concept into:
+
+- `C` conceptual: the system listens for real pain signals
+- `P` procedural: collect -> classify -> score -> draft -> approve -> post -> learn
+- `A` analogous: Agent Reach is to web/platform access what Radar is to market listening
+- `E` evidence: Agent Reach proves the access/fallback/doctor pattern works
+- `R` reference: queries, templates, and exact commands belong in the operational layer
+
+That distinction mattered because the system would otherwise collapse into one of two bad extremes:
+
+- theory without an implementation path
+- implementation without a clear operating model
+
+PACER kept the work honest.
+
+### Replymer Was Useful, But Not the Same Thing
+
+The comparison target was `Replymer`.
+
+What Replymer appears to do:
+
+- monitor public conversations
+- identify relevant posts
+- draft replies
+- in some cases offer managed posting or review workflows
+
+What MacBridge Radar became:
+
+- an internal founder tool
+- a listening and triage system
+- a reply-drafting system
+- a review queue with explicit approval state
+- a local board for human review
+
+The difference is not cosmetic.
+
+Replymer is closer to an outward-facing engagement service.
+MacBridge Radar is a founder-controlled operator tool.
+
+That choice was deliberate because the user-facing risk is real:
+
+- blind auto-replies get ignored
+- mass outreach gets flagged
+- platform trust gets damaged quickly
+
+So the implementation stayed on the safe side:
+
+- listen automatically
+- classify automatically
+- draft automatically
+- approve manually
+- export only approved items
+
+### Phase 1: Listening-Only Prototype
+
+The first version lived under:
+
+- `ops/radar/`
+
+The inputs were intentionally simple:
+
+- manual JSON lead files
+- optional RSS/Atom feed URLs
+
+The first pass used:
+
+- `queries.json` for pain and intent buckets
+- `sample/manual_leads.json` for local test leads
+- `feeds.txt` for optional feed sources
+- `schema/lead-item.schema.json` for the lead shape
+
+The core scan command was:
+
+```powershell
+python ops/radar/radar.py scan --manual ops/radar/sample/manual_leads.json --out ops/radar/output
+```
+
+It generated:
+
+- `radar-report.json`
+- `radar-brief.md`
+- `review-queue.json`
+
+That first run proved the heuristic ranking behavior:
+
+- the strongest X/Reddit pain posts scored highest
+- the generic GitHub question scored low and became `no_reply`
+
+That was the correct outcome.
+
+### Phase 2: Review Queue and Draft Assist
+
+The next step added explicit queue management:
+
+- `review --list`
+- `review --approve <id>`
+- `review --reject <id>`
+- `review --export-approved <file>`
+
+This is where the system stopped being just a detector and became an operator aid.
+
+The reviewed queue became the durable state:
+
+- `pending_review`
+- `approved`
+- `rejected`
+- `posted`
+
+The first version also attached reply drafts per lead:
+
+- `help_only`
+- `help_plus_soft_mention`
+
+This is important because the system is not about auto-selling.
+It is about having the right answer ready when there is real intent.
+
+### Phase 3: Review Board and Local Human Surface
+
+The review queue was still too raw to use comfortably, so a local HTML board was added:
+
+- `board --queue ... --out ops/radar/output/radar-board.html`
+
+That board showed:
+
+- score
+- recommendation
+- source platform
+- author
+- query matches
+- review status
+- both reply drafts
+
+The board is read-only by design.
+Review decisions stay explicit through the CLI.
+
+### The Refactor Was Forced by the File-Size Discipline
+
+The first Radar implementation was too large for the file-size rule.
+
+That triggered the same lesson the shell control plane already taught:
+
+> if the code is trying to do too much in one place, split it before adding more complexity
+
+Radar was refactored into:
+
+- `models.py`
+- `sources.py`
+- `engine.py`
+- `review.py`
+- `board.py`
+- `radar.py`
+
+That split made the system easier to test and reason about:
+
+- `models.py` owns typed values and queue serialization
+- `sources.py` owns manual-file and RSS ingestion
+- `engine.py` owns scoring and draft generation
+- `review.py` owns queue state transitions
+- `board.py` owns the HTML review surface
+- `radar.py` owns CLI dispatch
+
+The split was not optional. It was the only way to keep the module honest.
+
+### Exact Toolchain Used In This Pass
+
+This pass used a different toolchain than the shell stack:
+
+#### Python verification
+
+- `python ops/radar/radar.py scan --manual ops/radar/sample/manual_leads.json --out ops/radar/output`
+- `python ops/radar/radar.py review --queue ops/radar/output/review-queue.json --list`
+- `python ops/radar/radar.py review --queue ops/radar/output/review-queue.json --approve ...`
+- `python ops/radar/radar.py review --queue ops/radar/output/review-queue.json --reject ...`
+- `python ops/radar/radar.py review --queue ops/radar/output/review-queue.json --export-approved ...`
+- `python ops/radar/radar.py board --queue ops/radar/output/review-queue.json --out ops/radar/output/radar-board.html`
+- `python -m py_compile ops/radar/models.py ops/radar/sources.py ops/radar/engine.py ops/radar/review.py ops/radar/board.py ops/radar/radar.py`
+
+#### Docs verification
+
+- `LEAD_INTEL_PACER.md` for the PACER framing
+- `ops/radar/README.md` for the workflow
+
+#### Content verification
+
+- sample leads from `ops/radar/sample/manual_leads.json`
+- heuristics from `ops/radar/queries.json`
+- queue export from `ops/radar/output/approved-leads.json`
+- HTML board from `ops/radar/output/radar-board.html`
+
+### What This Changed
+
+Before this pass:
+
+- MacBridge had an operating control plane for provisioning
+- there was no internal lead-intel workflow
+- response drafting would have been ad hoc and manual
+
+After this pass:
+
+- Radar exists as a separate ops module
+- discovery is separated from posting
+- reply drafting is separated from approval
+- the founder can inspect, triage, and export leads without turning the system into a bot
+
+### The Operational Lesson
+
+This act adds a new product lesson:
+
+> The same discipline that keeps provisioning safe also keeps outbound growth safe.  
+> Separate listening from posting, drafts from approvals, and evidence from assumptions.
+
+---
+
+## Act X: First Live Source Connector, Reddit Search RSS, and Why the Live Edge Still Needs Guardrails
+
+**Context:** Radar had a clean local pipeline, but it was still only as real as the sample JSON we fed into it. The next step was to connect it to an actual public source and prove that the scan path could bring in fresh items without breaking the review queue or the scoring surface.
+
+### The Connector Chosen
+
+The first live connector is Reddit search RSS. It fits the product better than a blind API scrape because:
+
+- it is publicly reachable
+- it returns Atom/RSS that the existing parser can consume
+- it surfaces the kind of technical pain MacBridge cares about
+- it keeps the system in "listen first" mode instead of posting automatically
+
+The live path is exposed through the Radar CLI as an optional scan flag, so local fixtures and live discovery can run together.
+
+### What Was Implemented
+
+- live search requests are built from the existing query buckets
+- the connector uses `httpx2` with the production client defaults
+- RSS/Atom parsing stays in the source layer, not the CLI
+- live items are deduped before scoring
+- HTTP 429 responses are handled as a soft failure so one bad request does not kill the whole scan
+- the resulting live leads flow into the same `review-queue.json` / `radar-brief.md` surfaces as the manual leads
+
+### What Broke On The Way
+
+The first attempt used the wrong live source and turned into a dead-end:
+
+- the HN API path returned no useful hits for this domain
+- broad query expansion created too many requests and triggered rate limiting
+- the scan aborted when 429s were not handled as a soft failure
+
+The fix was not to pretend those were good results. The fix was to:
+
+- switch to a source that actually returns relevant public discussion
+- collapse query expansion into a smaller live search set
+- treat rate limits as a warning, not a fatal error
+
+### What This Proved
+
+The Radar pipeline is now source-connected:
+
+- it can start from manual leads
+- it can bring in at least one live public lead source
+- it can survive upstream throttling without losing the entire run
+- it can still hand the founder a queue that is reviewable and exportable
+
+The live edge is still best-effort, not magical. That is correct for a first connector.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*

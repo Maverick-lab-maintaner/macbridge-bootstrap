@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://maverixlabs.com/schemas/macbridge-radar-lead-item.schema.json",
+  "title": "MacBridge Radar Lead Item",
+  "type": "object",
+  "required": [
+    "id",
+    "platform",
+    "url",
+    "captured_at",
+    "summary",
+    "fit_score",
+    "promo_risk",
+    "recommended_mode",
+    "status"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "platform": { "type": "string" },
+    "source_type": { "type": "string" },
+    "url": { "type": "string" },
+    "author": { "type": "string" },
+    "captured_at": { "type": "string" },
+    "query_matches": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "summary": { "type": "string" },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "fit_score": { "type": "integer" },
+    "promo_risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "recommended_mode": {
+      "type": "string",
+      "enum": ["help_only", "help_plus_soft_mention", "no_reply"]
+    },
+    "drafts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["mode", "text"],
+        "properties": {
+          "mode": { "type": "string" },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending_review", "approved", "rejected", "posted"]
+    },
+    "review_notes": { "type": "string" },
+    "reviewed_at": { "type": "string" }
+  }
+}

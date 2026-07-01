@@ -1,0 +1,42 @@
+{
+  "direct_pain": [
+    "flutter ios build windows",
+    "xcode from windows",
+    "testflight without mac",
+    "build ios without mac",
+    "cloud mac for flutter",
+    "need mac for testflight",
+    "xcode not found flutter"
+  ],
+  "cost_pain": [
+    "codemagic expensive",
+    "codemagic alternative",
+    "paying for mac rental",
+    "macstadium too expensive",
+    "cloud mac cost"
+  ],
+  "friction_pain": [
+    "cocoapods flutter ios error",
+    "simulator runtime missing",
+    "ruby cocoapods issue mac",
+    "flutter ios build failing",
+    "mac setup is painful"
+  ],
+  "buying_intent": [
+    "what should i use instead",
+    "any alternative",
+    "need this fast",
+    "deadline",
+    "client launch",
+    "production build",
+    "this week",
+    "asap"
+  ],
+  "negative_context": [
+    "show me your startup",
+    "drop your product",
+    "promotion thread",
+    "self promo",
+    "self-promo"
+  ]
+}
