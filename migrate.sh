@@ -60,11 +60,24 @@ LATEST_VERSION="v2"
 # ── Lists available versions ───────────────────────────────────────────────
 
 list_versions() {
+    local versions=()
     echo ""
     echo -e "${BOLD}Available Golden Images:${NC}"
     echo ""
 
-    for ver in $(echo "${!GOLDEN_IMAGES[@]}" | tr ' ' '\n' | sort -V); do
+    local ver
+    for ver in "${!GOLDEN_IMAGES[@]}"; do
+        versions+=("$ver")
+    done
+
+    IFS=$'\n' versions=($(printf '%s\n' "${versions[@]}" | perl -e 'print sort {
+        my ($an) = $a =~ /(\d+)/;
+        my ($bn) = $b =~ /(\d+)/;
+        ($an // 0) <=> ($bn // 0) || $a cmp $b
+    } <STDIN>'))
+    unset IFS
+
+    for ver in "${versions[@]}"; do
         local marker=""
         [ "$ver" = "$LATEST_VERSION" ] && marker=" ${GREEN}(latest)${NC}"
         [ "$ver" = "$(get_current_version)" ] && marker="$marker ${CYAN}(current)${NC}"

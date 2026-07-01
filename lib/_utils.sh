@@ -35,6 +35,7 @@ header(){ echo -e "${BOLD}${CYAN}━━━ $1 ━━━━━━━━━━━�
 # ── Logging ────────────────────────────────────────────────────────────────
 
 MACBRIDGE_REPORT_URL="${MACBRIDGE_REPORT_URL:-}"
+MACBRIDGE_USAGE_LOG="${MACBRIDGE_USAGE_LOG:-${MACBRIDGE_LOG_DIR:-logs}/usage-events.ndjson}"
 
 # Log a line to both stdout and the log file
 log() {
@@ -58,6 +59,18 @@ report_to_webhook() {
         > /dev/null 2>&1 || true
 }
 
+record_usage_event() {
+    local payload="$1"
+    local usage_dir
+    usage_dir="$(dirname "$MACBRIDGE_USAGE_LOG")"
+    mkdir -p "$usage_dir" 2>/dev/null || true
+    printf '%s\n' "$payload" >> "$MACBRIDGE_USAGE_LOG" 2>/dev/null || true
+}
+
+json_string() {
+    perl -MJSON::PP -e 'print encode_json($ARGV[0])' -- "${1-}"
+}
+
 # Send a structured event (layer pass/fail, health check result)
 report_event() {
     local event_type="$1"  # bootstrap_layer, health_check, cleanup
@@ -71,18 +84,57 @@ report_event() {
     local payload
     payload=$(cat <<EOF
 {
-  "machine_id": "$machine_id",
-  "hostname": "$hostname",
-  "event_type": "$event_type",
-  "status": "$status",
-  "detail": "$detail",
-  "layer": "$layer",
-  "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
-  "user": "$(whoami)"
+  "machine_id": $(json_string "$machine_id"),
+  "hostname": $(json_string "$hostname"),
+  "event_type": $(json_string "$event_type"),
+  "status": $(json_string "$status"),
+  "detail": $(json_string "$detail"),
+  "layer": $(json_string "$layer"),
+  "timestamp": $(json_string "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"),
+  "user": $(json_string "$(whoami)")
 }
 EOF
 )
+    record_usage_event "$payload"
     report_to_webhook "$payload"
+}
+
+version_ge() {
+    local min_version="${1:-0}"
+    local version="${2:-0}"
+    local IFS=.
+    local i
+    local -a min_parts=() version_parts=()
+
+    read -r -a min_parts <<< "$min_version"
+    read -r -a version_parts <<< "$version"
+
+    local max_len=${#min_parts[@]}
+    if [ "${#version_parts[@]}" -gt "$max_len" ]; then
+        max_len=${#version_parts[@]}
+    fi
+
+    for ((i = 0; i < max_len; i++)); do
+        local min_part="${min_parts[i]:-0}"
+        local version_part="${version_parts[i]:-0}"
+
+        if ((10#$version_part > 10#$min_part)); then
+            return 0
+        fi
+        if ((10#$version_part < 10#$min_part)); then
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+resolve_script_path() {
+    local target="${1:-$0}"
+    (
+        cd "$(dirname "$target")" >/dev/null 2>&1 || exit 1
+        printf '%s/%s\n' "$(pwd)" "$(basename "$target")"
+    )
 }
 
 # ── Utility Functions ──────────────────────────────────────────────────────

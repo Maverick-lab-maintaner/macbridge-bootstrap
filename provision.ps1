@@ -1,56 +1,35 @@
 <#
 .SYNOPSIS
-    MacBridge — Windows Provisioning Tool
+    MacBridge Windows provisioning tool.
 .DESCRIPTION
     Copies the macbridge-bootstrap scripts to a cloud Mac via SCP,
     executes bootstrap.sh remotely via SSH, and streams output to
     the Windows terminal. Saves session info for reconnection.
-
-    This is the bridge between your Windows machine and the cloud Mac.
-    No more manual SCP + SSH + copy-paste.
-
 .PARAMETER MacHost
-    The cloud Mac's IP address or hostname (required).
-
+    The cloud Mac IP address or hostname.
 .PARAMETER User
-    SSH username (default: the local username, or 'admin' for Macly).
-
+    SSH username. Defaults to admin.
 .PARAMETER KeyPath
-    Path to SSH private key (default: ~\.ssh\id_ed25519).
-
+    Path to the SSH private key.
 .PARAMETER BootstrapDir
-    Local path to macbridge-bootstrap directory (default: current directory).
-
+    Local path to the macbridge-bootstrap directory.
 .PARAMETER RemoteDir
-    Directory on the Mac to copy bootstrap to (default: ~/macbridge-bootstrap).
-
+    Destination directory on the Mac.
 .PARAMETER Tier
-    Provisioning tier — "agent" for full setup, or specific layer (default: agent).
-
+    Provisioning tier. Defaults to agent.
 .PARAMETER ReportTo
-    Webhook URL for centralized log shipping during bootstrap.
-
+    Optional webhook URL for centralized log shipping.
 .PARAMETER Welcome
     Run welcome.sh after bootstrap completes.
-
 .PARAMETER Hardening
     Run hardening.sh after bootstrap completes.
-
-.EXAMPLE
-    .\provision.ps1 -MacHost 203.0.113.47
-
-.EXAMPLE
-    .\provision.ps1 -MacHost 203.0.113.47 -KeyPath ~\.ssh\macly_key -Welcome -Hardening
-
-.EXAMPLE
-    .\provision.ps1 -MacHost 203.0.113.47 -ReportTo https://dash.example.com/api/report
 #>
 
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$MacHost,
 
-    [string]$User = $env:USERNAME,
+    [string]$User = "admin",
 
     [string]$KeyPath = "$HOME\.ssh\id_ed25519",
 
@@ -69,38 +48,58 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ── Validation ─────────────────────────────────────────────────────────────
+function Fail-Step {
+    param(
+        [string]$Message,
+        [int]$Code = 1
+    )
 
-if (-not (Test-Path $KeyPath)) {
-    Write-Host "❌ SSH key not found: $KeyPath" -ForegroundColor Red
-    Write-Host "   Generate one: ssh-keygen -t ed25519 -f $KeyPath"
-    exit 1
+    Write-Host $Message -ForegroundColor Red
+    exit $Code
 }
 
-if (-not (Test-Path "$BootstrapDir\bootstrap.sh")) {
-    Write-Host "❌ bootstrap.sh not found in $BootstrapDir" -ForegroundColor Red
-    Write-Host "   Run this script from the macbridge-bootstrap directory."
-    exit 1
+function Run-Ssh {
+    param(
+        [string[]]$ExtraArgs = @(),
+        [string]$Command
+    )
+
+    $args = @() + $script:sshOpts + $ExtraArgs + @("${User}@${MacHost}", $Command)
+    & ssh @args 2>&1
+    return $LASTEXITCODE
 }
 
-# ── Banner ─────────────────────────────────────────────────────────────────
+function Run-Scp {
+    param(
+        [string]$Source,
+        [string]$Destination
+    )
+
+    $args = @() + $script:scpOpts + @($Source, $Destination)
+    & scp @args 2>&1
+    return $LASTEXITCODE
+}
+
+if (-not (Test-Path -LiteralPath $KeyPath)) {
+    Fail-Step "SSH key not found: $KeyPath"
+}
+
+if (-not (Test-Path -LiteralPath (Join-Path $BootstrapDir "bootstrap.sh"))) {
+    Fail-Step "bootstrap.sh not found in $BootstrapDir"
+}
 
 Clear-Host
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║              🏗️  MacBridge — Provision                         ║" -ForegroundColor Cyan
-Write-Host "║              Windows → Cloud Mac                              ║" -ForegroundColor Cyan
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "MacBridge Provision" -ForegroundColor Cyan
+Write-Host "Windows to Cloud Mac" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Mac:    $MacHost" -ForegroundColor Cyan
-Write-Host "  User:   $User" -ForegroundColor Cyan
-Write-Host "  Tier:   $Tier" -ForegroundColor Cyan
+Write-Host ("  Mac:    {0}" -f $MacHost) -ForegroundColor Cyan
+Write-Host ("  User:   {0}" -f $User) -ForegroundColor Cyan
+Write-Host ("  Tier:   {0}" -f $Tier) -ForegroundColor Cyan
 if ($ReportTo) {
-    Write-Host "  Report: $ReportTo" -ForegroundColor Cyan
+    Write-Host ("  Report: {0}" -f $ReportTo) -ForegroundColor Cyan
 }
 Write-Host ""
-
-# ── SSH options ────────────────────────────────────────────────────────────
 
 $sshOpts = @(
     "-i", $KeyPath,
@@ -116,109 +115,64 @@ $scpOpts = @(
     "-r"
 )
 
-# ── Step 1: Test SSH connectivity ──────────────────────────────────────────
-
-Write-Host "→ Testing SSH connection..." -ForegroundColor Cyan
-try {
-    $testResult = & ssh @sshOpts "$User@$MacHost" "echo 'CONNECTED'" 2>&1
-    if ($testResult -match "CONNECTED") {
-        Write-Host "  ✅ SSH connection established" -ForegroundColor Green
-    } else {
-        Write-Host "  ❌ SSH connection failed: $testResult" -ForegroundColor Red
-        exit 1
-    }
-} catch {
-    Write-Host "  ❌ SSH connection failed: $_" -ForegroundColor Red
-    exit 1
+Write-Host "-> Testing SSH connection..." -ForegroundColor Cyan
+$testOutput = Run-Ssh -Command "echo CONNECTED"
+if ($LASTEXITCODE -ne 0 -or ($testOutput -notmatch "CONNECTED")) {
+    Fail-Step ("SSH connection failed: {0}" -f ($testOutput | Out-String).Trim())
 }
-
+Write-Host "  OK SSH connection established" -ForegroundColor Green
 Write-Host ""
 
-# ── Step 2: SCP bootstrap to Mac ───────────────────────────────────────────
-
-Write-Host "→ Copying bootstrap scripts to Mac..." -ForegroundColor Cyan
-try {
-    & scp @scpOpts "$BootstrapDir" "$User@$MacHost`:$RemoteDir" 2>&1 | Out-Null
-    Write-Host "  ✅ Scripts copied to $RemoteDir" -ForegroundColor Green
-} catch {
-    Write-Host "  ❌ SCP failed: $_" -ForegroundColor Red
-    exit 1
+Write-Host "-> Copying bootstrap scripts to Mac..." -ForegroundColor Cyan
+$scpTarget = "{0}@{1}:{2}" -f $User, $MacHost, $RemoteDir
+$scpOutput = Run-Scp -Source $BootstrapDir -Destination $scpTarget
+if ($LASTEXITCODE -ne 0) {
+    Fail-Step ("SCP failed: {0}" -f ($scpOutput | Out-String).Trim())
 }
-
+Write-Host ("  OK Scripts copied to {0}" -f $RemoteDir) -ForegroundColor Green
 Write-Host ""
 
-# ── Step 3: Run bootstrap ──────────────────────────────────────────────────
-
-$bootstrapCmd = "cd $RemoteDir && bash bootstrap.sh --tier $Tier"
+$bootstrapCmd = "cd $RemoteDir; bash bootstrap.sh --tier $Tier"
 if ($ReportTo) {
     $bootstrapCmd += " --report-to '$ReportTo'"
 }
 
-Write-Host "→ Running bootstrap on Mac..." -ForegroundColor Cyan
-Write-Host "  This may take ~35 minutes. Output streams below."
-Write-Host ""
-Write-Host "──────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host "-> Running bootstrap on Mac..." -ForegroundColor Cyan
+Write-Host "  This may take about 35 minutes. Output streams below."
 Write-Host ""
 
-$bootstrapExit = 0
-try {
-    & ssh @sshOpts "$User@$MacHost" $bootstrapCmd 2>&1
-    $bootstrapExit = $LASTEXITCODE
-} catch {
-    Write-Host "❌ Bootstrap execution failed: $_" -ForegroundColor Red
-    $bootstrapExit = 1
+$bootstrapExit = Run-Ssh -Command $bootstrapCmd
+if ($bootstrapExit -ne 0) {
+    Fail-Step ("Bootstrap failed (exit code: {0})" -f $bootstrapExit) $bootstrapExit
 }
-
 Write-Host ""
-Write-Host "──────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-
-if ($bootstrapExit -eq 0) {
-    Write-Host "✅ Bootstrap completed successfully" -ForegroundColor Green
-} else {
-    Write-Host "❌ Bootstrap failed (exit code: $bootstrapExit)" -ForegroundColor Red
-    Write-Host "   Check logs on Mac: cat $RemoteDir/logs/bootstrap-*.log"
-    exit $bootstrapExit
-}
-
-# ── Step 4: Optional Harden ────────────────────────────────────────────────
+Write-Host "OK Bootstrap completed successfully" -ForegroundColor Green
 
 if ($Hardening) {
     Write-Host ""
-    Write-Host "→ Running firewall hardening..." -ForegroundColor Cyan
-    $hardenCmd = "cd $RemoteDir && bash hardening.sh"
-
-    $hardenExit = 0
-    try {
-        & ssh @sshOpts "$User@$MacHost" $hardenCmd 2>&1
-        $hardenExit = $LASTEXITCODE
-    } catch {
-        $hardenExit = 1
-    }
-
+    Write-Host "-> Running firewall hardening..." -ForegroundColor Cyan
+    $hardenExit = Run-Ssh -Command "cd $RemoteDir; bash hardening.sh"
     if ($hardenExit -eq 0) {
-        Write-Host "  ✅ Firewall hardened — only SSH (22) + VNC (5900) open" -ForegroundColor Green
+        Write-Host "  OK Firewall hardening completed" -ForegroundColor Green
     } else {
-        Write-Host "  ⚠️  Hardening reported issues — check output above" -ForegroundColor Yellow
+        Write-Host "  WARN Hardening reported issues. Check the output above." -ForegroundColor Yellow
     }
 }
-
-# ── Step 5: Optional Welcome Wizard ────────────────────────────────────────
 
 if ($Welcome) {
     Write-Host ""
-    Write-Host "→ Running Welcome Wizard..." -ForegroundColor Cyan
-    Write-Host "  (interactive — you will be prompted for API keys)" -ForegroundColor Yellow
+    Write-Host "-> Running Welcome Wizard..." -ForegroundColor Cyan
+    Write-Host "  Interactive: you will be prompted for API keys." -ForegroundColor Yellow
     Write-Host ""
 
-    & ssh -t @sshOpts "$User@$MacHost" "cd $RemoteDir && bash welcome.sh"
+    $welcomeExit = Run-Ssh -ExtraArgs @("-t") -Command "cd $RemoteDir; bash welcome.sh"
+    if ($welcomeExit -ne 0) {
+        Fail-Step ("Welcome Wizard failed (exit code: {0})" -f $welcomeExit) $welcomeExit
+    }
 }
 
-# ── Step 6: Save session info ──────────────────────────────────────────────
-
-$sessionDir = "$HOME\.macbridge"
-$sessionFile = "$sessionDir\session.json"
-
+$sessionDir = Join-Path $HOME ".macbridge"
+$sessionFile = Join-Path $sessionDir "session.json"
 New-Item -ItemType Directory -Path $sessionDir -Force | Out-Null
 
 $session = @{
@@ -231,25 +185,20 @@ $session = @{
     reportTo = $ReportTo
 } | ConvertTo-Json
 
-Set-Content -Path $sessionFile -Value $session
-
-# ── Summary ────────────────────────────────────────────────────────────────
+Set-Content -LiteralPath $sessionFile -Value $session
 
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║              🟢  Provisioning Complete                        ║" -ForegroundColor Green
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
-Write-Host ""
-Write-Host "  SSH:     ssh -i $KeyPath $User@$MacHost" -ForegroundColor Cyan
-Write-Host "  Session: $sessionFile" -ForegroundColor Cyan
-Write-Host ""
+Write-Host "Provisioning complete" -ForegroundColor Green
+Write-Host ("  SSH:     ssh -i {0} {1}@{2}" -f $KeyPath, $User, $MacHost) -ForegroundColor Cyan
+Write-Host ("  Session: {0}" -f $sessionFile) -ForegroundColor Cyan
 
 if (-not $Welcome) {
+    Write-Host ""
     Write-Host "  Next on the Mac:" -ForegroundColor Cyan
-    Write-Host "    cd $RemoteDir && bash welcome.sh" -ForegroundColor White
+    Write-Host ("    cd {0}; bash welcome.sh" -f $RemoteDir) -ForegroundColor White
 }
 
 if ($ReportTo) {
     Write-Host ""
-    Write-Host "  Health checks streaming to: $ReportTo" -ForegroundColor Cyan
+    Write-Host ("  Health checks streaming to: {0}" -f $ReportTo) -ForegroundColor Cyan
 }

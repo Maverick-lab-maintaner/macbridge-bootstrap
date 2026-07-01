@@ -1,27 +1,11 @@
 #!/bin/bash
-# =============================================================================
-# MacBridge — Verify
-# =============================================================================
-# Independent health check script. Validates the entire MacBridge environment
-# without making any changes. Can be run at any time to confirm the Mac is
-# still in a ready state.
-#
-# Runs AFTER bootstrap to confirm success, or standalone to audit an existing
-# Mac. Read-only — never installs, never modifies.
-#
-# Usage:
-#   bash verify.sh          # Full verification
-#   bash verify.sh --quick  # Fast check (critical paths only)
-#   bash verify.sh --json   # Machine-readable JSON output
-#
-# Lessons encoded (Phase 0):
-#   Lesson 8: Verification at every layer — this is the independent audit
-#   Lesson 4: Ownership checks — catches silent permission breaks
-# =============================================================================
-
 set -euo pipefail
 
-# ── Configuration ──────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="${SCRIPT_DIR}/lib"
+
+[ -f "${LIB_DIR}/_utils.sh" ] && source "${LIB_DIR}/_utils.sh"
+[ -f "${LIB_DIR}/status-contract.sh" ] && source "${LIB_DIR}/status-contract.sh"
 
 QUICK_MODE=false
 JSON_MODE=false
@@ -29,7 +13,7 @@ JSON_MODE=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --quick) QUICK_MODE=true; shift ;;
-        --json)  JSON_MODE=true; shift ;;
+        --json) JSON_MODE=true; shift ;;
         --help|-h)
             echo "Usage: bash verify.sh [--quick] [--json]"
             exit 0
@@ -38,232 +22,167 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Track results
-CHECKS_PASSED=0
-CHECKS_FAILED=0
-CHECKS_WARN=0
-declare -A CHECK_RESULTS
-
-# ── Helpers ────────────────────────────────────────────────────────────────
+status_contract_init "verify"
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
-check() {
-    local name="$1"
-    local command="$2"
-    local label="${3:-$name}"
-
-    if eval "$command" > /dev/null 2>&1; then
-        CHECK_RESULTS["$name"]="PASS"
-        ((CHECKS_PASSED++)) || true
-        if [ "$JSON_MODE" = false ]; then
-            printf "  ${GREEN}✅${NC} %-35s %s\n" "$label" "$(eval "$command" 2>/dev/null | head -1 || echo '')"
-        fi
-        return 0
-    else
-        CHECK_RESULTS["$name"]="FAIL"
-        ((CHECKS_FAILED++)) || true
-        if [ "$JSON_MODE" = false ]; then
-            printf "  ${RED}❌${NC} %-35s %s\n" "$label" "NOT FOUND"
-        fi
-        return 1
-    fi
+run_capture() {
+    local command="$1"
+    local output
+    set +e
+    output=$(eval "$command" 2>/dev/null)
+    local rc=$?
+    set -e
+    printf '%s' "$output"
+    return "$rc"
 }
 
-check_version() {
-    local name="$1"
-    local command="$2"
-    local min_version="$3"
-    local label="${4:-$name}"
+print_result() {
+    local icon="$1"
+    local color="$2"
+    local label="$3"
+    local value="$4"
+    [ "$JSON_MODE" = true ] && return 0
+    printf "  ${color}%s${NC} %-35s %s\n" "$icon" "$label" "$value"
+}
 
-    if ! command -v "${command%% *}" > /dev/null 2>&1; then
-        CHECK_RESULTS["$name"]="FAIL"
-        ((CHECKS_FAILED++)) || true
-        if [ "$JSON_MODE" = false ]; then
-            printf "  ${RED}❌${NC} %-35s %s\n" "$label" "NOT FOUND"
-        fi
-        return 1
+record_check() {
+    local name="$1"
+    local label="$2"
+    local command="$3"
+    local severity="${4:-critical}"
+    local empty_value="${5:-ok}"
+    local output
+
+    if output="$(run_capture "$command")"; then
+        output="$(printf '%s' "$output" | head -1)"
+        [ -z "$output" ] && output="$empty_value"
+        status_record_pass "$name" "$label" "$severity" "$output"
+        print_result "PASS" "$GREEN" "$label" "$output"
+        return 0
     fi
 
+    status_record_fail "$name" "$label" "$severity" "missing"
+    print_result "FAIL" "$RED" "$label" "NOT FOUND"
+    return 0
+}
+
+record_version_check() {
+    local name="$1"
+    local label="$2"
+    local command="$3"
+    local min_version="$4"
+    local severity="${5:-critical}"
     local version
-    version=$(eval "$command" 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)*' | head -1 || echo "0")
-    if [ "$(printf '%s\n' "$min_version" "$version" | sort -V | head -1)" = "$min_version" ]; then
-        CHECK_RESULTS["$name"]="PASS"
-        ((CHECKS_PASSED++)) || true
-        if [ "$JSON_MODE" = false ]; then
-            printf "  ${GREEN}✅${NC} %-35s %s\n" "$label" "$version"
-        fi
-        return 0
-    else
-        CHECK_RESULTS["$name"]="WARN"
-        ((CHECKS_WARN++)) || true
-        if [ "$JSON_MODE" = false ]; then
-            printf "  ${YELLOW}⚠️${NC}  %-35s %s (min: %s)\n" "$label" "$version" "$min_version"
-        fi
+
+    version="$(run_capture "$command" | grep -oE '[0-9]+(\.[0-9]+)*' | head -1 || true)"
+
+    if [ -z "$version" ]; then
+        status_record_fail "$name" "$label" "$severity" "missing"
+        print_result "FAIL" "$RED" "$label" "NOT FOUND"
         return 0
     fi
+
+    if version_ge "$min_version" "$version"; then
+        status_record_pass "$name" "$label" "$severity" "$version"
+        print_result "PASS" "$GREEN" "$label" "$version"
+        return 0
+    fi
+
+    status_record_warn "$name" "$label" "$severity" "$version"
+    [ "$JSON_MODE" = false ] && printf "  ${YELLOW}WARN${NC} %-35s %s (min: %s)\n" "$label" "$version" "$min_version"
+    return 0
 }
 
-# ── Banner ─────────────────────────────────────────────────────────────────
-
 if [ "$JSON_MODE" = false ]; then
     echo ""
-    echo -e "${BOLD}${CYAN}🔍 MacBridge — Environment Verification${NC}"
-    echo "──────────────────────────────────────────────"
+    echo -e "${BOLD}${CYAN}MacBridge Environment Verification${NC}"
     echo ""
-fi
-
-# ── System checks ──────────────────────────────────────────────────────────
-
-if [ "$JSON_MODE" = false ]; then
     echo -e "${BOLD}System:${NC}"
 fi
 
-check "os"          "uname -s | grep Darwin"                                    "macOS"
-check "disk_50gb"   "[ \$(df -g / 2>/dev/null | awk 'NR==2 {print \$4}') -gt 50 ]"  "Disk >50GB free"
-check "network"     "ping -c 1 -W 5 8.8.8.8 > /dev/null 2>&1"                   "Network reachable"
-check "home_write"  "[ -w \$HOME ]"                                              "HOME writable"
-
-if [ "$JSON_MODE" = false ]; then echo ""; fi
-
-# ── Apple toolchain ────────────────────────────────────────────────────────
+record_check "os" "macOS" "uname -s | grep Darwin" "critical" "Darwin"
+record_check "disk_50gb" "Disk >50GB free" "[ \$(df -g / 2>/dev/null | awk 'NR==2 {print \$4}') -gt 50 ] && df -g / 2>/dev/null | awk 'NR==2 {print \$4 \"GB free\"}'" "critical" "ok"
+record_check "network" "Network reachable" "ping -c 1 -W 5 8.8.8.8 > /dev/null 2>&1 && echo reachable" "critical" "reachable"
+record_check "home_write" "HOME writable" "[ -w \$HOME ] && echo writable" "critical" "writable"
 
 if [ "$JSON_MODE" = false ]; then
+    echo ""
     echo -e "${BOLD}Apple Toolchain:${NC}"
 fi
 
-check "xcode_app"   "[ -d /Applications/Xcode.app ]"                             "Xcode installed"
-check "xcodebuild"  "xcodebuild -version"                                        "xcodebuild"
-check "xcode_clt"   "xcode-select -p"                                            "Command Line Tools"
+record_check "xcode_app" "Xcode installed" "[ -d /Applications/Xcode.app ] && echo installed" "critical" "installed"
+record_check "xcodebuild" "xcodebuild" "xcodebuild -version | head -1" "critical" "available"
+record_check "xcode_clt" "Command Line Tools" "xcode-select -p" "critical" "configured"
 
 if [ "$QUICK_MODE" = false ]; then
-    check "simulator"   "xcrun simctl list runtimes 2>/dev/null | grep -q iOS"   "iOS Simulator runtime"
-else
-    if [ "$JSON_MODE" = false ]; then
-        printf "  ${YELLOW}⏭️${NC}  %-35s %s\n" "iOS Simulator" "(skipped — quick mode)"
-    fi
+    record_check "simulator" "iOS Simulator runtime" "xcrun simctl list runtimes | grep iOS | head -1" "critical" "installed"
+elif [ "$JSON_MODE" = false ]; then
+    printf "  ${YELLOW}SKIP${NC} %-35s %s\n" "iOS Simulator runtime" "(quick mode)"
 fi
 
-if [ "$JSON_MODE" = false ]; then echo ""; fi
-
-# ── Development tools ──────────────────────────────────────────────────────
-
 if [ "$JSON_MODE" = false ]; then
+    echo ""
     echo -e "${BOLD}Development Tools:${NC}"
 fi
 
-check       "homebrew"      "brew --version"                          "Homebrew"
-check       "git"           "git --version"                           "Git"
-check       "gh_cli"        "gh --version"                            "GitHub CLI"
-check       "ssh_key"       "[ -f \$HOME/.ssh/id_ed25519 ]"           "SSH key (ed25519)"
-
-# Flutter check with version display
-if [ "$QUICK_MODE" = false ]; then
-    check   "flutter"       "flutter --version"                       "Flutter SDK"
-
-    if command -v flutter > /dev/null 2>&1; then
-        if [ "$JSON_MODE" = false ]; then
-            FLUTTER_CHANNEL=$(flutter channel 2>/dev/null | grep '*' | awk '{print $2}' || echo "unknown")
-            printf "  ${CYAN}  →${NC} %-33s %s\n" "Flutter channel:" "$FLUTTER_CHANNEL"
-        fi
-    fi
-else
-    check   "flutter"       "flutter --version 2>/dev/null | head -1" "Flutter SDK"
-fi
-
-# Ruby check (Lesson 2: must be >= 3.0 for CocoaPods)
-check_version "ruby"    "ruby --version"    "3.0"  "Ruby"
-check       "cocoapods" "pod --version"            "CocoaPods"
-
-if [ "$JSON_MODE" = false ]; then echo ""; fi
-
-# ── AI agents ──────────────────────────────────────────────────────────────
+record_check "homebrew" "Homebrew" "brew --version | head -1" "critical" "installed"
+record_check "git" "Git" "git --version | head -1" "critical" "installed"
+record_check "gh_cli" "GitHub CLI" "gh --version | head -1" "advisory" "installed"
+record_check "ssh_key" "SSH key (ed25519)" "[ -f \$HOME/.ssh/id_ed25519 ] && echo present" "advisory" "present"
+record_check "flutter" "Flutter SDK" "flutter --version | head -1" "critical" "installed"
+record_version_check "ruby" "Ruby" "ruby --version" "3.0" "critical"
+record_check "cocoapods" "CocoaPods" "pod --version | head -1" "critical" "installed"
 
 if [ "$JSON_MODE" = false ]; then
+    echo ""
     echo -e "${BOLD}AI Agents:${NC}"
 fi
 
-check       "node"      "node --version"                          "Node.js"
-check       "npm"       "npm --version"                           "npm"
+record_check "node" "Node.js" "node --version | head -1" "critical" "installed"
+record_check "npm" "npm" "npm --version | head -1" "critical" "installed"
 
 if [ "$QUICK_MODE" = false ]; then
-    check   "claude"    "which claude"                            "Claude Code"
-    check   "opencode"  "which opencode"                          "OpenCode"
-    check   "codex"     "which codex"                             "Codex CLI"
-else
+    record_check "claude" "Claude Code" "which claude" "advisory" "installed"
+    record_check "opencode" "OpenCode" "which opencode" "advisory" "installed"
+    record_check "codex" "Codex CLI" "which codex" "advisory" "installed"
+elif [ "$JSON_MODE" = false ]; then
+    printf "  ${YELLOW}SKIP${NC} %-35s %s\n" "Agent CLIs" "(quick mode)"
+fi
+
+record_check "tmux" "tmux" "tmux -V | head -1" "advisory" "installed"
+
+if [ "$QUICK_MODE" = false ]; then
     if [ "$JSON_MODE" = false ]; then
-        printf "  ${YELLOW}⏭️${NC}  %-35s %s\n" "Agent CLIs" "(skipped — quick mode)"
+        echo ""
+        echo -e "${BOLD}Configuration:${NC}"
     fi
+    record_check "ssh_config" "SSH config" "[ -f \$HOME/.ssh/config ] && echo present" "advisory" "present"
+    record_check "tmux_config" "tmux config" "[ -f \$HOME/.tmux.conf ] && echo present" "advisory" "present"
+    record_check "ssh_keepalive" "SSH keepalive" "grep -q ServerAliveInterval \$HOME/.ssh/config 2>/dev/null && echo configured" "advisory" "configured"
+    record_check "brew_in_path" "Homebrew in PATH" "echo \$PATH | grep homebrew" "advisory" "configured"
 fi
-
-check       "tmux"      "tmux -V"                                 "tmux"
-
-if [ "$JSON_MODE" = false ]; then echo ""; fi
-
-# ── Configuration checks ───────────────────────────────────────────────────
-
-if [ "$QUICK_MODE" = false ] && [ "$JSON_MODE" = false ]; then
-    echo -e "${BOLD}Configuration:${NC}"
-
-    check "ssh_config"   "[ -f \$HOME/.ssh/config ]"                "SSH config"
-    check "tmux_config"  "[ -f \$HOME/.tmux.conf ]"                 "tmux config"
-    check "ssh_keepalive" "grep -q ServerAliveInterval \$HOME/.ssh/config 2>/dev/null" "SSH keepalive"
-
-    # PATH check — are critical tools reachable in a fresh shell?
-    check "brew_in_path" "echo \$PATH | grep -q homebrew"           "Homebrew in PATH"
-
-    echo ""
-fi
-
-# ── WHOAMI ─────────────────────────────────────────────────────────────────
-
-if [ "$JSON_MODE" = false ]; then
-    echo -e "${BOLD}Environment:${NC}"
-    echo -e "  User:     ${CYAN}$(whoami)${NC}"
-    echo -e "  Hostname: ${CYAN}$(hostname -s 2>/dev/null || echo 'unknown')${NC}"
-    echo -e "  macOS:    ${CYAN}$(sw_vers -productVersion 2>/dev/null || echo 'unknown')${NC}"
-    echo -e "  Arch:     ${CYAN}$(uname -m)${NC}"
-    echo ""
-fi
-
-# ── Summary ────────────────────────────────────────────────────────────────
 
 if [ "$JSON_MODE" = true ]; then
-    # JSON output
-    echo "{"
-    echo "  \"status\": \"$([ "$CHECKS_FAILED" -eq 0 ] && echo 'ready' || echo 'degraded')\","
-    echo "  \"checks_passed\": $CHECKS_PASSED,"
-    echo "  \"checks_failed\": $CHECKS_FAILED,"
-    echo "  \"checks_warn\": $CHECKS_WARN,"
-    echo "  \"results\": {"
-    FIRST=true
-    for key in "${!CHECK_RESULTS[@]}"; do
-        if [ "$FIRST" = false ]; then echo ","; fi
-        printf "    \"%s\": \"%s\"" "$key" "${CHECK_RESULTS[$key]}"
-        FIRST=false
-    done
-    echo ""
-    echo "  }"
-    echo "}"
-    exit $([ "$CHECKS_FAILED" -eq 0 ] && echo 0 || echo 1)
+    status_emit_json
+    [ "$STATUS_FAIL" -eq 0 ] && exit 0 || exit 1
 fi
 
-echo "──────────────────────────────────────────────"
+echo ""
+echo -e "${BOLD}Environment:${NC}"
+echo -e "  User:     ${CYAN}$(whoami)${NC}"
+echo -e "  Hostname: ${CYAN}$(hostname -s 2>/dev/null || echo 'unknown')${NC}"
+echo -e "  macOS:    ${CYAN}$(sw_vers -productVersion 2>/dev/null || echo 'unknown')${NC}"
+echo -e "  Arch:     ${CYAN}$(uname -m)${NC}"
+echo ""
 echo -e "${BOLD}Verification Summary:${NC}"
-echo -e "  ${GREEN}Passed:${NC} ${CHECKS_PASSED}"
-echo -e "  ${RED}Failed:${NC} ${CHECKS_FAILED}"
-echo -e "  ${YELLOW}Warnings:${NC} ${CHECKS_WARN}"
+echo -e "  State:    ${CYAN}$(status_state)${NC}"
+echo -e "  Passed:   ${GREEN}${STATUS_PASS}${NC}"
+echo -e "  Failed:   ${RED}${STATUS_FAIL}${NC}"
+echo -e "  Warnings: ${YELLOW}${STATUS_WARN}${NC}"
+echo ""
+echo -e "  ${CYAN}Next:${NC} $(status_next_action)"
 echo ""
 
-if [ "$CHECKS_FAILED" -eq 0 ]; then
-    echo -e "${BOLD}${GREEN}✅ Environment ready${NC} — All critical checks passed."
-    echo ""
-    exit 0
-else
-    echo -e "${BOLD}${RED}❌ Environment degraded${NC} — ${CHECKS_FAILED} check(s) failed."
-    echo ""
-    echo -e "  Run ${CYAN}bash bootstrap.sh --from <layer>${NC} to fix failing layers."
-    echo ""
-    exit 1
-fi
+[ "$STATUS_FAIL" -eq 0 ] && exit 0 || exit 1

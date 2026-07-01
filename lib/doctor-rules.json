@@ -1,0 +1,107 @@
+[
+  {
+    "id": "disk_50gb",
+    "title": "Disk headroom is too low for reliable builds",
+    "severity": "critical",
+    "fix": [
+      "Run `bash cleanup.sh --dry-run` to see reclaimable user data.",
+      "Run `bash cleanup.sh --force` if the machine can be reset.",
+      "Increase the VM disk allocation if cleanup is not enough."
+    ]
+  },
+  {
+    "id": "network",
+    "title": "Network connectivity is unavailable",
+    "severity": "critical",
+    "fix": [
+      "Confirm outbound internet access from the Mac host.",
+      "Re-run `ping 8.8.8.8` and inspect provider firewall or NAT rules.",
+      "If this is a fleet issue, mark the machine unavailable for new sessions."
+    ]
+  },
+  {
+    "id": "xcode_app",
+    "title": "Xcode is missing from the machine image",
+    "severity": "critical",
+    "fix": [
+      "Install Xcode in the golden image through the GUI once.",
+      "Re-run `bash bootstrap.sh --from 1` after installation completes."
+    ]
+  },
+  {
+    "id": "xcodebuild",
+    "title": "Xcode command-line tools are not usable",
+    "severity": "critical",
+    "fix": [
+      "Run `sudo xcode-select -switch /Applications/Xcode.app` if Xcode exists.",
+      "Accept the license with `sudo xcodebuild -license accept`.",
+      "Re-run `bash bootstrap.sh --from 1`."
+    ]
+  },
+  {
+    "id": "simulator",
+    "title": "iOS simulator runtime is unavailable",
+    "severity": "critical",
+    "fix": [
+      "Open Xcode and install the required iOS runtime once in the image.",
+      "Re-run `bash bootstrap.sh --from 1` to verify the Apple toolchain."
+    ]
+  },
+  {
+    "id": "flutter",
+    "title": "Flutter SDK is missing or unusable",
+    "severity": "critical",
+    "fix": [
+      "Re-run `bash bootstrap.sh --from 2`.",
+      "Check that Homebrew and PATH updates landed in `~/.zprofile`."
+    ]
+  },
+  {
+    "id": "ruby",
+    "title": "Ruby version is below the supported baseline",
+    "severity": "critical",
+    "fix": [
+      "Install or repair Homebrew Ruby.",
+      "Ensure the Homebrew Ruby bin path is ahead of system Ruby in PATH.",
+      "Re-run `bash bootstrap.sh --from 2`."
+    ]
+  },
+  {
+    "id": "cocoapods",
+    "title": "CocoaPods is missing or broken",
+    "severity": "critical",
+    "fix": [
+      "Install CocoaPods from the Homebrew Ruby environment.",
+      "Verify `pod --version` works in a fresh shell.",
+      "Re-run `bash bootstrap.sh --from 2`."
+    ]
+  },
+  {
+    "id": "gh_cli",
+    "title": "GitHub CLI is unavailable",
+    "severity": "advisory",
+    "fix": [
+      "Install GitHub CLI with Homebrew.",
+      "Run `gh auth login` during onboarding."
+    ]
+  },
+  {
+    "id": "ssh_key",
+    "title": "No SSH key is present for repository access",
+    "severity": "advisory",
+    "fix": [
+      "Generate a key with `ssh-keygen -t ed25519`.",
+      "Add the public key to GitHub before cloning private repositories."
+    ]
+  },
+  {
+    "id": "tmux",
+    "title": "tmux is unavailable for session persistence",
+    "severity": "advisory",
+    "fix": [
+      "Install tmux with Homebrew.",
+      "Re-run the agent layer if session persistence is part of the tier."
+    ]
+  }
+]
+

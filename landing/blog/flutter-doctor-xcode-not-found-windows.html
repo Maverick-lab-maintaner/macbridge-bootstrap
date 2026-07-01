@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flutter Doctor Says Xcode Is Missing on Windows &mdash; Here's Why</title>
+<meta name="description" content="flutter doctor will always flag the iOS toolchain as missing on Windows. Here's why that's expected, and what to actually do about it.">
+<meta property="og:title" content="Flutter Doctor Says Xcode Is Missing on Windows — Here's Why">
+<meta property="og:description" content="flutter doctor will always flag the iOS toolchain as missing on Windows. Here's why that's expected, and what to actually do about it.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://macbridge.app/blog/flutter-doctor-xcode-not-found-windows.html">
+<meta property="og:site_name" content="MacBridge">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Flutter Doctor Says Xcode Is Missing on Windows — Here's Why">
+<meta name="twitter:description" content="flutter doctor will always flag the iOS toolchain as missing on Windows. Here's why that's expected, and what to actually do about it.">
+<link rel="canonical" href="https://macbridge.app/blog/flutter-doctor-xcode-not-found-windows.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Flutter Doctor Says Xcode Is Missing on Windows — Here's Why",
+  "description": "flutter doctor will always flag the iOS toolchain as missing on Windows. Here's why that's expected, and what to actually do about it.",
+  "author": {"@type": "Organization", "name": "MacBridge"},
+  "publisher": {"@type": "Organization", "name": "MacBridge"},
+  "datePublished": "2026-07-01",
+  "dateModified": "2026-07-01",
+  "mainEntityOfPage": "https://macbridge.app/blog/flutter-doctor-xcode-not-found-windows.html"
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="shell">
+  <nav class="topbar">
+    <div class="container">
+      <a class="brand" href="/" aria-label="MacBridge home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-copy">
+          <strong>MacBridge</strong>
+          <span>Cloud macOS for shipping iOS</span>
+        </span>
+      </a>
+      <div class="nav">
+        <a href="/#why">Why it works</a>
+        <a href="/#flow">How it works</a>
+        <a href="/#tooling">Environment</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="/blog/" aria-current="page">Guides</a>
+        <a class="button button-secondary" href="/#contact">Join beta</a>
+      </div>
+    </div>
+    <div class="container mobile-nav" aria-label="Section navigation">
+      <a href="/#why">Why</a>
+      <a href="/#flow">Flow</a>
+      <a href="/#tooling">Environment</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/blog/">Guides</a>
+      <a href="/#contact">Contact</a>
+    </div>
+  </nav>
+
+  <main id="main">
+    <div class="container article-shell">
+      <a class="article-breadcrumb" href="/blog/">&larr; All guides</a>
+      <div class="article-header">
+        <span class="eyebrow">Troubleshooting</span>
+        <h1>Flutter Doctor Says Xcode Is Missing on Windows &mdash; Here's Why</h1>
+        <p class="article-meta">MacBridge Team &middot; Updated July 2026</p>
+        <p class="article-dek">This isn't a bug you can fix locally &mdash; here's what's actually going on, and what to do next.</p>
+      </div>
+
+      <div class="article-body">
+        <p>Run <code>flutter doctor</code> on a Windows machine and you'll see something like this in the output:</p>
+        <pre><code>[&#10007;] Xcode - develop for iOS and macOS
+    &#10007; Xcode installation is incomplete</code></pre>
+        <p>If you've spent any time searching for a fix, you've probably tried reinstalling Flutter, checking your PATH, or reading through GitHub issues looking for a Windows-specific workaround. Here's the actual answer: <strong>there isn't one, because this isn't a bug.</strong></p>
+
+        <h2>Why This Happens</h2>
+        <p>Xcode is macOS-only software. It is not available for Windows, has never been available for Windows, and Apple has no plans to change that &mdash; code signing and the iOS build toolchain are tied to macOS by design, not by an oversight Flutter's tooling could patch around.</p>
+        <p><code>flutter doctor</code> checks for Xcode because it's a required dependency for the iOS build target. On Windows, that check will always fail, because the dependency genuinely cannot be installed on your OS. This is expected behavior, not an error in your setup.</p>
+
+        <h2>What You Can Still Do on Windows</h2>
+        <p>The Android side of Flutter development is entirely unaffected:</p>
+        <ul>
+          <li>Write and edit all your Dart/Flutter code normally</li>
+          <li>Run <code>flutter pub get</code>, hot reload, and debug on Android emulators or physical Android devices</li>
+          <li>Build and test your app's logic, UI, and state management fully</li>
+        </ul>
+        <p>None of this requires Xcode. The gap is specifically the final iOS compile, code signing, and Simulator testing steps &mdash; nothing else.</p>
+
+        <h2>What to Do When You're Ready to Build for iOS</h2>
+        <p>Since Xcode can't run on Windows, you have to reach a macOS environment for that final step. Your options, roughly by effort:</p>
+        <ol>
+          <li><strong>A cloud Mac rental</strong> (MacinCloud, rentamac.io) &mdash; remote access to a real Mac, but you'll walk through installing Xcode, CocoaPods, and the rest of the toolchain yourself once you connect.</li>
+          <li><strong>A CI/CD build service</strong> (Codemagic, GitHub Actions macOS runners) &mdash; push your code, get an automated build back, no interactive access.</li>
+          <li><strong>A prepared cloud macOS environment</strong> (MacBridge) &mdash; connects you to a machine where Xcode, Flutter, and CocoaPods are already installed and verified, so <code>flutter doctor</code> shows a clean iOS toolchain the moment you log in.</li>
+        </ol>
+        <p>Whichever route you pick, once you're on macOS and Xcode is properly installed, run <code>flutter doctor</code> again &mdash; the iOS toolchain check should pass, and <code>flutter build ios</code> becomes available.</p>
+
+        <h2>The One-Line Summary</h2>
+        <p><code>flutter doctor</code> flagging Xcode on Windows isn't something to fix locally &mdash; it's Flutter correctly telling you that the iOS toolchain lives on a different operating system, and you'll need access to macOS (owned, rented, or provided) when you're ready to build for iPhone.</p>
+      </div>
+
+      <div class="article-cta panel">
+        <p>Looking for a macOS environment where this check already passes? MacBridge has Xcode, Flutter, and CocoaPods pre-installed and verified &mdash; currently in beta.</p>
+        <a class="button button-primary" href="/#contact">Request beta access</a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-row">
+      <div class="footer-meta">
+        <p><strong>MacBridge</strong> by <strong>Maverix Labs</strong></p>
+        <span>Cloud macOS workflow for shipping iOS without owning the machine layer.</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/blog/">Guides</a></li>
+        <li><a href="/#contact">Contact</a></li>
+        <li><a href="https://github.com/Maverick-lab-maintaner/macbridge-bootstrap">GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

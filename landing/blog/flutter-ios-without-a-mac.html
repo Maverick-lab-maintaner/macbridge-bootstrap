@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How to Build &amp; Ship a Flutter iOS App Without a Mac (2026 Guide)</title>
+<meta name="description" content="Every real way to build, test, and ship a Flutter iOS app to TestFlight without owning a Mac — cloud rentals, CI services, and prepared dev environments compared.">
+<meta property="og:title" content="How to Build & Ship a Flutter iOS App Without a Mac (2026 Guide)">
+<meta property="og:description" content="Every real way to build, test, and ship a Flutter iOS app to TestFlight without owning a Mac — cloud rentals, CI services, and prepared dev environments compared.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://macbridge.app/blog/flutter-ios-without-a-mac.html">
+<meta property="og:site_name" content="MacBridge">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="How to Build & Ship a Flutter iOS App Without a Mac (2026 Guide)">
+<meta name="twitter:description" content="Every real way to build, test, and ship a Flutter iOS app to TestFlight without owning a Mac — cloud rentals, CI services, and prepared dev environments compared.">
+<link rel="canonical" href="https://macbridge.app/blog/flutter-ios-without-a-mac.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "How to Build and Ship a Flutter iOS App Without a Mac",
+  "description": "Every real way to build, test, and ship a Flutter iOS app to TestFlight without owning a Mac — cloud rentals, CI services, and prepared dev environments compared.",
+  "author": {"@type": "Organization", "name": "MacBridge"},
+  "publisher": {"@type": "Organization", "name": "MacBridge"},
+  "datePublished": "2026-07-01",
+  "dateModified": "2026-07-01",
+  "mainEntityOfPage": "https://macbridge.app/blog/flutter-ios-without-a-mac.html"
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="shell">
+  <nav class="topbar">
+    <div class="container">
+      <a class="brand" href="/" aria-label="MacBridge home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-copy">
+          <strong>MacBridge</strong>
+          <span>Cloud macOS for shipping iOS</span>
+        </span>
+      </a>
+      <div class="nav">
+        <a href="/#why">Why it works</a>
+        <a href="/#flow">How it works</a>
+        <a href="/#tooling">Environment</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="/blog/" aria-current="page">Guides</a>
+        <a class="button button-secondary" href="/#contact">Join beta</a>
+      </div>
+    </div>
+    <div class="container mobile-nav" aria-label="Section navigation">
+      <a href="/#why">Why</a>
+      <a href="/#flow">Flow</a>
+      <a href="/#tooling">Environment</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/blog/">Guides</a>
+      <a href="/#contact">Contact</a>
+    </div>
+  </nav>
+
+  <main id="main">
+    <div class="container article-shell">
+      <a class="article-breadcrumb" href="/blog/">&larr; All guides</a>
+      <div class="article-header">
+        <span class="eyebrow">Guide</span>
+        <h1>How to Build and Ship a Flutter iOS App Without a Mac</h1>
+        <p class="article-meta">MacBridge Team &middot; Updated July 2026</p>
+        <p class="article-dek">A practical 2026 snapshot of the main options, representative price ranges, and where the friction still lives.</p>
+      </div>
+
+      <div class="article-body">
+        <p>If you develop Flutter on Windows or Linux, you've hit the same wall every iOS developer outside the Apple ecosystem hits eventually: Apple requires Xcode to compile, sign, and archive an iOS build, and Xcode only runs on macOS. This isn't a Flutter limitation &mdash; it applies to every cross-platform framework, including React Native. Your app logic, UI, and business code can live entirely on Windows. The final compile step cannot.</p>
+
+        <p>The good news: this is a solved problem. It's been solved, re-solved, and re-discussed on Reddit for eight years running (r/FlutterDev threads on this go back to 2018). What's changed is the number of legitimate ways to solve it, and how much setup each one still asks of you.</p>
+
+        <p>This guide walks through the main practical options in 2026, representative pricing ranges, and where the friction still lives. Vendor rates and plan details change often, so use the numbers here as context, not as a permanent price sheet.</p>
+
+        <h2>Why You Need macOS at All</h2>
+        <p>Three things in the iOS pipeline are macOS-only, no matter which tool you use:</p>
+        <ul>
+          <li><strong>Xcode</strong> &mdash; Apple's IDE and the only supported way to compile a <code>.ipa</code> file</li>
+          <li><strong>Code signing</strong> &mdash; tied to the macOS keychain and your Apple Developer account</li>
+          <li><strong>The iOS Simulator</strong> &mdash; for testing without a physical device</li>
+        </ul>
+        <p>Everything else &mdash; writing Dart code, running <code>flutter pub get</code>, editing your UI &mdash; works fine on Windows today. The gap is narrow but non-negotiable: at some point, your code has to touch a Mac.</p>
+        <p>You'll also need an <strong>Apple Developer account</strong> ($99/year) regardless of which path below you choose. No service &mdash; MacBridge included &mdash; can remove that requirement; it's an Apple contractual step for App Store and TestFlight distribution.</p>
+
+        <h2>Your Options, Compared</h2>
+        <table>
+          <tr><th>Option</th><th>What it actually is</th><th>Typical cost</th><th>You still do this yourself</th></tr>
+          <tr><td>Buy a used Mac mini</td><td>Own hardware</td><td>$300&ndash;600 one-time</td><td>Everything: setup, maintenance, OS updates</td></tr>
+          <tr><td>Cloud Mac rental (MacinCloud, rentamac.io)</td><td>Remote access to a real Mac</td><td>~$3.30&ndash;4/day, or ~$99/month</td><td>Install Xcode, Flutter, CocoaPods, and everything else yourself</td></tr>
+          <tr><td>CI/CD build service (Codemagic)</td><td>Automated pipeline that compiles your app on managed Macs</td><td>Free tier plus paid team plans; verify current limits and rates</td><td>No debugging environment &mdash; build-only, config-driven</td></tr>
+          <tr><td>Upload-and-build (Code2Native)</td><td>Upload source, get a signed IPA back</td><td>$2&ndash;10 per build</td><td>No live environment at all &mdash; one-shot builds only</td></tr>
+          <tr><td>GitHub Actions macOS runners</td><td>CI on GitHub's own Mac runners</td><td>Free tier minutes billed at 10x for macOS</td><td>You write and maintain the CI workflow yourself</td></tr>
+          <tr><td>MacBridge (beta)</td><td>A cloud macOS environment with Flutter, Xcode, CocoaPods, and your AI coding agent already installed and verified</td><td>From $19/month (early access pricing)</td><td>Bring your repo and your Apple Developer account &mdash; the environment itself arrives ready</td></tr>
+        </table>
+
+        <h3>Buy a Used Mac Mini</h3>
+        <p>The traditional answer, and still a fine one if you build iOS constantly and want zero recurring cost. A used M1 or M2 Mac mini runs $300&ndash;600. The tradeoff is upfront cash, plus you're now responsible for macOS updates, Xcode updates, and keeping CocoaPods and Ruby from silently breaking every few months &mdash; the exact maintenance loop that pushes most Windows-based Flutter teams to look for an alternative in the first place.</p>
+
+        <h3>Cloud Mac Rental (MacinCloud, rentamac.io)</h3>
+        <p>You get remote access &mdash; usually via VNC or RDP &mdash; to an actual Mac, billed by the day or month. Public pricing for services like MacinCloud or rentamac.io tends to land in that general range, but exact figures move with hardware generation and vendor policy. This solves the hardware problem completely. It does not solve the setup problem &mdash; you land on a bare macOS install and walk through the same CLT &rarr; Xcode &rarr; Flutter &rarr; CocoaPods sequence you'd do on owned hardware. Budget 1&ndash;2 hours the first time, and expect to repeat parts of it if the provider resets your instance.</p>
+
+        <h3>CI/CD Build Services (Codemagic)</h3>
+        <p>Codemagic and similar services take a YAML config, spin up a managed Mac, and hand you back a signed build &mdash; genuinely good if your workflow is "push to main, get a TestFlight build." Codemagic has historically offered both a free tier and paid annual team plans, but the exact minutes, hardware tiers, and concurrency terms move over time and should be checked directly before budgeting. The limitation isn't price, it's shape: there's no interactive environment. If a build fails for a reason your config doesn't anticipate, you're debugging blind through logs, not sitting inside a terminal running <code>flutter doctor</code> and fixing it live.</p>
+
+        <h3>Upload-and-Build (Code2Native)</h3>
+        <p>The newest category: send your source or a repo URL, get back a signed <code>.ipa</code> a few minutes later, no Mac touched at any point, priced per build ($2&ndash;10). This is the fastest path for a single, infrequent build. It's not a development environment &mdash; you can't debug, iterate, or run the simulator. Think of it as the vending-machine option: fine for a final artifact, not for building.</p>
+
+        <h3>GitHub Actions macOS Runners</h3>
+        <p>If you already live in GitHub Actions, macOS runners are built in. The catch is that macOS minutes are materially more expensive than Linux minutes, so the usable budget disappears much faster once iOS becomes part of your normal pipeline. Workable for occasional builds, expensive fast if iOS becomes a regular part of your workflow, and &mdash; same as Codemagic &mdash; no live environment to debug inside.</p>
+
+        <h3>MacBridge (Beta)</h3>
+        <p>MacBridge is a cloud macOS environment built specifically for this problem, currently in beta. Instead of a bare Mac, you connect (via SSH or remote desktop) to a machine where Xcode, Flutter, CocoaPods, and your choice of AI coding agent &mdash; Claude Code, OpenCode, or Codex &mdash; are already installed and verified. You clone your repo and run <code>flutter build ios</code> in the same session you'd use on owned hardware, without the 1&ndash;2 hour setup pass that comes with a raw cloud Mac rental.</p>
+        <p>It's early: pricing is currently positioned at $19/month for early access and may adjust as usage data comes in, and it's aimed specifically at Flutter teams who want an actual environment (not just a build artifact) without owning the machine layer. If you've read this far because the setup tax &mdash; not the Mac itself &mdash; is what's been costing you time, that's the gap it's built for.</p>
+
+        <h2>Which Option Actually Fits You</h2>
+        <ul>
+          <li><strong>You build iOS constantly, want zero recurring cost, don't mind maintenance</strong> &rarr; used Mac mini</li>
+          <li><strong>You need a build artifact occasionally and don't want to touch a config file</strong> &rarr; Code2Native or MacinCloud pay-as-you-go</li>
+          <li><strong>You already have solid CI discipline and want automated builds on every push</strong> &rarr; Codemagic, or GitHub Actions if you're already there</li>
+          <li><strong>You want to actually develop and debug iOS from Windows, not just produce a build</strong> &rarr; a cloud Mac rental (if you don't mind the setup) or MacBridge (if you don't want to repeat that setup every time)</li>
+        </ul>
+
+        <h2>What Doesn't Change, No Matter Which You Pick</h2>
+        <ul>
+          <li>You still need your own Apple Developer account ($99/year) &mdash; no provider manages this for you, by Apple's design.</li>
+          <li>You still generate your own signing certificates and provisioning profiles, tied to your Apple ID.</li>
+          <li>You still submit through App Store Connect and go through TestFlight review yourself.</li>
+        </ul>
+        <p>Anyone who tells you otherwise is skipping a step you'll hit later.</p>
+
+        <h2>FAQ</h2>
+        <p><strong>Do I need a Mac to develop Flutter apps for iOS?</strong><br>No &mdash; you can write, build, and test the Android side of a Flutter app entirely on Windows or Linux. You only need macOS access for the final compile, code signing, and simulator testing steps specific to iOS.</p>
+        <p><strong>Can I publish to the App Store without ever owning a Mac?</strong><br>Yes. Cloud Mac rental, CI/CD build services, and prepared cloud environments like MacBridge all let you complete the full path to TestFlight and App Store submission without owning Apple hardware.</p>
+        <p><strong>What's the cheapest way to build a Flutter iOS app without a Mac?</strong><br>For a single occasional build, per-build services like Code2Native ($2&ndash;10/build) or GitHub Actions' free tier are cheapest. For ongoing development, cost depends more on how much setup time you're willing to repeat than on the sticker price of the service.</p>
+      </div>
+
+      <div class="article-cta panel">
+        <p>MacBridge is a cloud macOS environment with Xcode, Flutter, CocoaPods, and your AI coding agent pre-installed &mdash; currently in beta.</p>
+        <a class="button button-primary" href="/#contact">Request beta access</a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-row">
+      <div class="footer-meta">
+        <p><strong>MacBridge</strong> by <strong>Maverix Labs</strong></p>
+        <span>Cloud macOS workflow for shipping iOS without owning the machine layer.</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/blog/">Guides</a></li>
+        <li><a href="/#contact">Contact</a></li>
+        <li><a href="https://github.com/Maverick-lab-maintaner/macbridge-bootstrap">GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

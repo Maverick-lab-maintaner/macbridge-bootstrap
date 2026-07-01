@@ -961,4 +961,144 @@ After Act VI:
 
 ---
 
+## Act VII: Product Surface Hardening + CLI Status Repair
+
+**Context:** The repo had crossed an important threshold. It was no longer just bootstrap scripts plus a README. It now had a public landing page, a shared design system, comparison guides, and a Go CLI with a terminal status surface. The missing work was no longer feature count. It was **credibility, consistency, and maintenance discipline**.
+
+Three issues emerged together:
+
+1. The landing page looked strong, but still had dead-end CTA behavior and some product messaging that leaned too close to internal bootstrap posture.
+2. The blog/guides were useful, but some comparison and pricing claims were too time-sensitive to be treated as stable copy.
+3. The Go CLI "TUI" for `macbridge status` could misreport quick-mode omissions as failures.
+
+### Landing Page Redesign + UX Tightening
+
+**Files:** `landing/index.html`, `DESIGN.md`
+
+The landing page was rebuilt around the actual product claim:
+
+> iOS builds from Windows, without buying or babysitting a Mac.
+
+**The visual decision:** move from "nice repo microsite" to a more deliberate product surface. The page now uses a dark blue-green command-center palette, restrained cyan signal accents, strong display typography, glass panels, and a console-style environment block. The design system for that direction was codified in `DESIGN.md` so the site stopped depending on implicit taste decisions.
+
+**The copy decision:** remove internal provisioning leakage and focus on the buyer-facing value:
+- no Mac purchase,
+- no first-day Xcode setup,
+- a prepared cloud macOS environment,
+- a path to TestFlight,
+- agent-assisted development as part of the workflow.
+
+**The UX pass** then fixed the parts that still felt unfinished:
+- dead CTA behavior was replaced with a real contact/intake path,
+- a dedicated contact/next-step section was added,
+- mobile utility navigation became explicit instead of vanishing,
+- footer utility links were added,
+- skip link, focus states, and social meta tags were tightened.
+
+**The important product decision:** the UI stopped pretending a dedicated signup backend already existed. The current intake path now points to the GitHub repo / issue flow instead of a fake destination.
+
+### Shared Stylesheet Consolidation
+
+**Files:** `landing/index.html`, `landing/assets/site.css`
+
+The homepage and blog had drifted into an avoidable maintenance split:
+
+```
+landing/index.html      → private inline stylesheet
+landing/blog/*.html     → /assets/site.css
+```
+
+This meant a visual fix could land in one surface but not the other.
+
+**The fix:** the homepage now imports `/assets/site.css` directly. The shared stylesheet became the real source of truth for the public web surface, while the article/blog rules remain additive rather than forked into a second visual system.
+
+### Blog / Guide Credibility Pass
+
+**Files:**  
+`landing/blog/index.html`  
+`landing/blog/flutter-ios-without-a-mac.html`  
+`landing/blog/macbridge-vs-codemagic.html`  
+`landing/blog/macbridge-vs-cloud-mac-rental.html`
+
+The guides were already product-relevant and technically useful, but several passages used exact vendor pricing and plan details in a way that would age badly.
+
+**The correction:** move from "fixed-price certainty" to "snapshot / representative range / verify current rates" framing.
+
+Examples of the change:
+- Codemagic pricing language now reads as a dated snapshot, not a canonical price sheet.
+- MacBridge early-access pricing is explicitly described as provisional beta positioning.
+- Comparison tables now tell readers to verify current limits and rates instead of freezing exact tiers into evergreen copy.
+- The guide index lead-in was softened so the blog reads more like a practical reference library than a static rate card.
+
+**The editorial decision:** keep the commercial point of view, but stop overstating certainty where vendor pricing or hardware tiers can move underneath the content.
+
+### Go CLI Status / TUI Repair
+
+**File:** `cmd/macbridge/commands/status.go`
+
+The "TUI" turned out not to be a full interactive terminal application. It was a structured text status renderer behind:
+
+```bash
+macbridge status --host <mac> --user <user> --key <key>
+```
+
+**The bug:** `status` shells into the Mac and runs:
+
+```bash
+bash verify.sh --json --quick
+```
+
+But `--quick` intentionally skips some checks. The original Go code treated any missing check as:
+
+```go
+FAIL
+```
+
+That meant the status surface could show false failures simply because quick mode omitted a check.
+
+**The fix:** missing quick-mode checks now render as `SKIP`, not `FAIL`.
+
+While that functional bug was being fixed, the dashboard was upgraded into a more readable terminal surface:
+- structured sections (`Connection`, `Core toolchain`, `Agent surface`, `Attention`, `Next action`)
+- stable issue collection and ordering
+- explicit warning / failure badges
+- provider and host summary
+- use of the JSON contract already emitted by `verify.sh`
+
+This kept the CLI dependency-light while making the status surface materially more trustworthy.
+
+### Go Toolchain Clarification
+
+**Context:** An earlier verification attempt reported that `go` was unavailable. The real issue was shell PATH visibility in the Windows environment used for that command, not a missing Go installation.
+
+**What was later verified directly:**
+
+```powershell
+C:\Program Files\Go\bin\go.exe version
+C:\Program Files\Go\bin\go.exe test ./...
+```
+
+Results:
+- Go is installed and usable.
+- `go test ./...` passed in `macbridge-bootstrap`.
+
+**The real conclusion:** there was no repository-level Go failure. The issue was operational shell configuration, not Go source or module health.
+
+### What This Changed
+
+Before this pass:
+- the landing page looked promising but still had dead ends and duplicated styling,
+- some guide content was more sales-certain than durable,
+- the CLI status surface could misreport omitted checks as failures,
+- and the Go toolchain looked broken when it was actually just hidden from one shell.
+
+After this pass:
+- the public web surface reads more like a product and less like an internal provisioning artifact,
+- the homepage and guides share one stylesheet,
+- comparison copy is more credible over time,
+- the status TUI is more trustworthy,
+- and the Go situation is clarified: installed, testable, not a blocker.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*

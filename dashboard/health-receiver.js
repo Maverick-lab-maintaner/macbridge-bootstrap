@@ -1,25 +1,7 @@
-/**
- * MacBridge — Health Report Receiver
- * Cloudflare Worker that receives healthd.sh JSON reports from fleet Macs.
- *
- * Deploy:
- *   npx wrangler deploy
- *
- * Endpoints:
- *   POST /api/report  — Receive health check JSON from a Mac
- *   GET  /api/status  — Dashboard: show all Macs and their health status
- *   GET  /api/status/:id — Show single Mac status
- *
- * Storage: Cloudflare KV (free tier: 1GB, 10M reads/day)
- *   npx wrangler kv:namespace create MACBRIDGE_FLEET
- *   npx wrangler kv:namespace create MACBRIDGE_FLEET --preview
- */
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // CORS for dashboard access
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -32,19 +14,15 @@ export default {
 
     const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
 
-    // ── POST /api/report — Receive health report ──────────────────────────
-
     if (url.pathname === '/api/report' && request.method === 'POST') {
       try {
         const data = await request.json();
         const machineId = data.machine_id || 'unknown';
         const key = `mac:${machineId}`;
 
-        // Store latest report in KV
         await env.MACBRIDGE_FLEET.put(key, JSON.stringify(data));
-        // Store timestamp for "last seen" tracking
         await env.MACBRIDGE_FLEET.put(`${key}:last_seen`, new Date().toISOString());
-        // Keep a list of all known machine IDs
+
         const fleet = await env.MACBRIDGE_FLEET.get('fleet:all', 'json') || [];
         if (!fleet.includes(machineId)) {
           fleet.push(machineId);
@@ -55,15 +33,13 @@ export default {
           status: 200,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
-      } catch (e) {
+      } catch {
         return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
     }
-
-    // ── GET /api/status — Fleet dashboard ─────────────────────────────────
 
     if (url.pathname === '/api/status' && request.method === 'GET') {
       const fleet = await env.MACBRIDGE_FLEET.get('fleet:all', 'json') || [];
@@ -73,30 +49,31 @@ export default {
         const data = await env.MACBRIDGE_FLEET.get(`mac:${id}`, 'json');
         const lastSeen = await env.MACBRIDGE_FLEET.get(`mac:${id}:last_seen`);
         if (data) {
+          const state = data.summary?.state || data.status || data.overall || 'unknown';
           machines.push({
             machine_id: id,
             hostname: data.hostname,
-            overall: data.overall,
-            failed_count: data.failed_count,
+            state,
+            failed_count: data.failed_count || data.summary?.checks_failed || 0,
+            warn_count: data.summary?.checks_warn || 0,
             last_seen: lastSeen,
             timestamp: data.timestamp,
           });
         }
       }
 
-      // Sort: unhealthy first, then by last seen
+      const rank = { blocked: 0, degraded: 1, ready: 2 };
       machines.sort((a, b) => {
-        if (a.overall !== b.overall) return a.overall === 'degraded' ? -1 : 1;
+        if (a.state !== b.state) {
+          return (rank[a.state] ?? 9) - (rank[b.state] ?? 9);
+        }
         return (b.last_seen || '').localeCompare(a.last_seen || '');
       });
 
-      const html = renderDashboard(machines);
-      return new Response(html, {
+      return new Response(renderDashboard(machines), {
         headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders },
       });
     }
-
-    // ── GET /api/status/:id — Single Mac detail ───────────────────────────
 
     const statusMatch = url.pathname.match(/^\/api\/status\/(.+)$/);
     if (statusMatch && request.method === 'GET') {
@@ -116,30 +93,25 @@ export default {
       });
     }
 
-    // ── 404 ──────────────────────────────────────────────────────────────
-
-    return new Response('MacBridge Health Receiver — POST /api/report | GET /api/status', {
+    return new Response('MacBridge Health Receiver - POST /api/report | GET /api/status', {
       status: 404,
       headers: corsHeaders,
     });
   },
 };
 
-// ── Minimal dashboard HTML ─────────────────────────────────────────────────
-
 function renderDashboard(machines) {
-  const healthy = machines.filter(m => m.overall === 'healthy').length;
-  const degraded = machines.filter(m => m.overall !== 'healthy').length;
+  const ready = machines.filter(m => m.state === 'ready').length;
+  const degraded = machines.filter(m => m.state === 'degraded').length;
+  const blocked = machines.filter(m => m.state === 'blocked').length;
 
   const rows = machines.map(m => {
-    const statusColor = m.overall === 'healthy' ? '#4fd89d' : '#ef7b7b';
-    const statusIcon = m.overall === 'healthy' ? '🟢' : '🔴';
+    const statusColor = m.state === 'ready' ? '#4fd89d' : m.state === 'degraded' ? '#f2bf66' : '#ef7b7b';
     const lastSeen = m.last_seen ? new Date(m.last_seen).toLocaleString() : 'unknown';
     return `<tr>
-      <td>${statusIcon}</td>
       <td><strong>${m.hostname || m.machine_id}</strong></td>
-      <td><span style="color:${statusColor}">${m.overall}</span></td>
-      <td>${m.failed_count} failed</td>
+      <td><span style="color:${statusColor}">${m.state}</span></td>
+      <td>${m.failed_count} failed / ${m.warn_count} warn</td>
       <td style="color:#72889b;font-size:0.8rem">${lastSeen}</td>
     </tr>`;
   }).join('');
@@ -171,12 +143,13 @@ function renderDashboard(machines) {
 <body>
 <h1>MacBridge Fleet</h1>
 <div class="summary">
-  <div class="stat"><div class="value green">${healthy}</div><div class="label">Healthy</div></div>
-  <div class="stat"><div class="value red">${degraded}</div><div class="label">Degraded</div></div>
+  <div class="stat"><div class="value green">${ready}</div><div class="label">Ready</div></div>
+  <div class="stat"><div class="value" style="color:#f2bf66">${degraded}</div><div class="label">Degraded</div></div>
+  <div class="stat"><div class="value red">${blocked}</div><div class="label">Blocked</div></div>
   <div class="stat"><div class="value" style="color:#75cfff">${machines.length}</div><div class="label">Total</div></div>
 </div>
-${machines.length > 0 ? `<table><thead><tr><th></th><th>Machine</th><th>Status</th><th>Checks</th><th>Last Seen</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">No machines reporting yet. Run healthd.sh --webhook on each Mac.</div>'}
-<div class="footer">MacBridge Health Receiver · Refresh for updates · Machines report every 5 min</div>
+${machines.length > 0 ? `<table><thead><tr><th>Machine</th><th>Status</th><th>Checks</th><th>Last Seen</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">No machines reporting yet. Run healthd.sh --webhook on each Mac.</div>'}
+<div class="footer">MacBridge Health Receiver | Refresh for updates | Machines report every 5 min</div>
 </body>
 </html>`;
 }

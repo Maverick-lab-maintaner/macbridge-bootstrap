@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MacBridge vs Codemagic: Which Fits Your Flutter iOS Workflow?</title>
+<meta name="description" content="Codemagic is a CI/CD pipeline for automated iOS builds. MacBridge is a live macOS development environment. Here's how to choose between them.">
+<meta property="og:title" content="MacBridge vs Codemagic: Which Fits Your Flutter iOS Workflow?">
+<meta property="og:description" content="Codemagic is a CI/CD pipeline for automated iOS builds. MacBridge is a live macOS development environment. Here's how to choose between them.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://macbridge.app/blog/macbridge-vs-codemagic.html">
+<meta property="og:site_name" content="MacBridge">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MacBridge vs Codemagic: Which Fits Your Flutter iOS Workflow?">
+<meta name="twitter:description" content="Codemagic is a CI/CD pipeline for automated iOS builds. MacBridge is a live macOS development environment. Here's how to choose between them.">
+<link rel="canonical" href="https://macbridge.app/blog/macbridge-vs-codemagic.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "MacBridge vs Codemagic: Which One Do You Actually Need?",
+  "description": "Codemagic is a CI/CD pipeline for automated iOS builds. MacBridge is a live macOS development environment. Here's how to choose between them.",
+  "author": {"@type": "Organization", "name": "MacBridge"},
+  "publisher": {"@type": "Organization", "name": "MacBridge"},
+  "datePublished": "2026-07-01",
+  "dateModified": "2026-07-01",
+  "mainEntityOfPage": "https://macbridge.app/blog/macbridge-vs-codemagic.html"
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="shell">
+  <nav class="topbar">
+    <div class="container">
+      <a class="brand" href="/" aria-label="MacBridge home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-copy">
+          <strong>MacBridge</strong>
+          <span>Cloud macOS for shipping iOS</span>
+        </span>
+      </a>
+      <div class="nav">
+        <a href="/#why">Why it works</a>
+        <a href="/#flow">How it works</a>
+        <a href="/#tooling">Environment</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="/blog/" aria-current="page">Guides</a>
+        <a class="button button-secondary" href="/#contact">Join beta</a>
+      </div>
+    </div>
+    <div class="container mobile-nav" aria-label="Section navigation">
+      <a href="/#why">Why</a>
+      <a href="/#flow">Flow</a>
+      <a href="/#tooling">Environment</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/blog/">Guides</a>
+      <a href="/#contact">Contact</a>
+    </div>
+  </nav>
+
+  <main id="main">
+    <div class="container article-shell">
+      <a class="article-breadcrumb" href="/blog/">&larr; All guides</a>
+      <div class="article-header">
+        <span class="eyebrow">Comparison</span>
+        <h1>MacBridge vs Codemagic: Which One Do You Actually Need?</h1>
+        <p class="article-meta">MacBridge Team &middot; Updated July 2026</p>
+        <p class="article-dek">Codemagic automates builds. MacBridge gives you an environment to work in. They solve related but different problems.</p>
+      </div>
+
+      <div class="article-body">
+        <p>Both MacBridge and Codemagic exist to solve the same root problem &mdash; shipping a Flutter iOS build without owning a Mac. They solve it in different shapes, and picking the wrong one for your workflow means paying for capability you won't use.</p>
+        <p>The short version: <strong>Codemagic automates builds. MacBridge gives you an environment to work in.</strong> Which one you need depends on whether your bottleneck is "I need this to build automatically on every push" or "I need to actually debug and iterate on iOS from my Windows machine."</p>
+
+        <h2>What Codemagic Is</h2>
+        <p>Codemagic is a CI/CD platform. You write a <code>codemagic.yaml</code> config, push to your repository, and it spins up a managed Mac to run your build, tests, and code signing, then hands you back an artifact &mdash; typically routed straight to TestFlight. It's a mature, widely used product with deep Flutter-specific tooling.</p>
+        <p><strong>Pricing</strong> changes over time, so treat any public rate card as a snapshot rather than a constant. At publication, Codemagic offered a free tier plus paid annual plans for teams, but the exact minutes, hardware, and concurrency terms should be verified directly on codemagic.io before you use them for budgeting.</p>
+        <p><strong>Where it's strong:</strong> automated, repeatable builds triggered by git events. If your team already has CI discipline and iOS is just one more pipeline stage, Codemagic slots in cleanly.</p>
+        <p><strong>Where it's limited:</strong> there's no interactive session. If a build fails for a reason your YAML config didn't anticipate &mdash; a CocoaPods version conflict, a signing identity mismatch, an Xcode behavior change &mdash; you're reading logs, not sitting in a terminal running <code>flutter doctor</code> and fixing it live. Debugging happens by editing config and re-running the pipeline, which is slower than debugging in place.</p>
+
+        <h2>What MacBridge Is</h2>
+        <p>MacBridge is a cloud macOS environment, not a pipeline. You connect over SSH or remote desktop to a machine that already has Xcode, Flutter, CocoaPods, and your choice of AI coding agent (Claude Code, OpenCode, or Codex) installed and verified. You work in it the way you'd work on a local Mac &mdash; clone your repo, run commands, see errors immediately, fix them in the same session.</p>
+        <p><strong>Pricing:</strong> MacBridge is currently positioned at $19/month for early access, but that is beta pricing and should be treated as provisional rather than long-term published pricing.</p>
+        <p><strong>Where it's strong:</strong> iterative development and debugging. If something breaks, you're already inside the environment where it broke.</p>
+        <p><strong>Where it's limited right now:</strong> MacBridge is in beta. It doesn't yet have Codemagic's years of CI-specific tooling, or automated git-triggered pipelines. If your priority is "build automatically on every commit with zero human involvement," that's Codemagic's core use case today, not MacBridge's.</p>
+
+        <h2>Side by Side</h2>
+        <table>
+          <tr><th></th><th>Codemagic</th><th>MacBridge (beta)</th></tr>
+          <tr><td>Model</td><td>CI/CD pipeline</td><td>Interactive cloud environment</td></tr>
+          <tr><td>Best for</td><td>Automated builds on every push</td><td>Live development and debugging</td></tr>
+          <tr><td>Debugging</td><td>Through logs, config edits, re-runs</td><td>Directly, in the same session</td></tr>
+          <tr><td>AI coding agents</td><td>Not part of the product</td><td>Claude Code, OpenCode, Codex pre-installed</td></tr>
+          <tr><td>Entry pricing</td><td>Public free tier and paid plans; verify current limits</td><td>$19/month at current early-access pricing</td></tr>
+          <tr><td>Team-scale pricing</td><td>Paid annual plans available; verify current team pricing</td><td>Not yet published for teams</td></tr>
+          <tr><td>Maturity</td><td>Established, widely used</td><td>Beta</td></tr>
+        </table>
+
+        <h2>Can You Use Both?</h2>
+        <p>Yes, and many teams end up doing exactly that: develop and debug interactively in an environment like MacBridge, then hand the final, working configuration to Codemagic for repeatable automated builds once the workflow is stable. They're not mutually exclusive &mdash; one is a workbench, the other is an assembly line.</p>
+
+        <h2>The Honest Take</h2>
+        <p>If your team's current pain is "our iOS builds keep failing in CI for reasons we can't reproduce locally," an interactive environment solves that better than a pipeline will. If your pain is "we don't have any automated iOS build process at all," Codemagic solves that directly and it's a proven product. Match the tool to the actual bottleneck, not the category.</p>
+        <blockquote>Codemagic pricing referenced from <a href="https://codemagic.io/pricing/" target="_blank" rel="noopener">codemagic.io/pricing</a> &mdash; verify current rates before relying on them, as CI pricing changes frequently.</blockquote>
+      </div>
+
+      <div class="article-cta panel">
+        <p>MacBridge is a cloud macOS environment with Xcode, Flutter, CocoaPods, and your AI coding agent pre-installed &mdash; currently in beta.</p>
+        <a class="button button-primary" href="/#contact">Request beta access</a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-row">
+      <div class="footer-meta">
+        <p><strong>MacBridge</strong> by <strong>Maverix Labs</strong></p>
+        <span>Cloud macOS workflow for shipping iOS without owning the machine layer.</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/blog/">Guides</a></li>
+        <li><a href="/#contact">Contact</a></li>
+        <li><a href="https://github.com/Maverick-lab-maintaner/macbridge-bootstrap">GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
