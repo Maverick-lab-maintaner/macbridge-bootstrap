@@ -175,9 +175,11 @@ checksums match). Five beta keys generated.
 
 ### Maintenance posture (the "Xcode breaks overnight" question)
 
-Covered: nightly clean-Mac verification (above) + failure emails (path proven — a real
-failure notification already landed) + `doctor.sh` remediation (11 rules) + `migrate.sh`
-opt-in upgrades + strict CI gates. **Open:** the release watchers
-(`lib/watcher-xcode.sh`/`-flutter.sh`) are still unscheduled; `doctor-rules.json` grows
-only by discipline (every new breakage → a rule); no auto-escalation/user-notification
-flow yet (matters once Managed customers exist); single-maintainer risk is inherent.
+Covered: nightly clean-Mac verification (above) + **weekly release watchers**
+(`release-watchers.yml`, Mondays 06:00 UTC — Xcode + Flutter feeds checked against a
+cached baseline; a new release turns the run red → owner email → rebuild the golden
+image; alerts exactly once per release) + failure emails (path proven — a real failure
+notification already landed) + `doctor.sh` remediation (11 rules) + `migrate.sh` opt-in
+upgrades + strict CI gates. **Open:** `doctor-rules.json` grows only by discipline
+(every new breakage → a rule); no auto-escalation/user-notification flow yet (matters
+once Managed customers exist); single-maintainer risk is inherent.
