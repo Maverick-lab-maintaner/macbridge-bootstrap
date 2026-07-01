@@ -2324,4 +2324,23 @@ Before: a proven toolchain nobody could install, and a conversion rate of 0% by 
 
 ---
 
+## Act XX: v0.1.0 Ships — The Tap, the Tag, and the Release Workflow That Tripped Over Its Own Formula
+
+**Context:** Studio P0 was merged and proven; this act executed the release checklist end to end — the first publicly installable MacBridge.
+
+**What shipped:** the public tap repo (`Maverick-lab-maintaner/homebrew-tap`, formula seeded then updated with real sha256s), the `v0.1.0` tag → GitHub Release with `macbridge-v0.1.0-darwin-arm64`/`-amd64`, `-windows-amd64.exe`, and `checksums.txt`, and five beta keys from `mbkeygen`. A customer can now run `brew tap maverick-lab-maintaner/tap && brew install macbridge`.
+
+**Two small twists, both instructive:**
+
+1. **The fresh tap clone had no git identity** (`unable to auto-detect email address`) — the main repo's identity is local config, not global. Copied `user.name`/`user.email` across. A fresh clone on this machine will always need this.
+2. **The first release run failed on its own repo layout:** `sha256sum *` inside `dist/` hit `dist/homebrew/` — the committed formula template shares the tree with build outputs. `sha256sum: homebrew: Is a directory`, exit 1, no release. Fix: scope to `sha256sum macbridge-*` and release only `dist/macbridge-* dist/checksums.txt` (PR #14), then **move the tag** — delete local+remote, re-tag the fixed commit, push — because the workflow runs from the tag's commit, not from master.
+
+**Verification, three ways:** the Windows release artifact was downloaded and executed (`macbridge version v0.1.0` — ldflags stamp confirmed); the strict smoke was dispatched **on the tag itself** (`--ref v0.1.0`) and produced Layer 2 ✅, iOS build ✅, **🟢 MAC READY** on a real Apple runner; and the tap formula carries the release's real checksums.
+
+**The operational lesson:**
+
+> A release pipeline is code that runs for the first time when you least want surprises — rehearse it by actually cutting the tag, and when it fails, remember the workflow executes at the tag's commit, so the fix must be re-tagged, not just merged.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
