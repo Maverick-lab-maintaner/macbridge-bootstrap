@@ -3,656 +3,1210 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MacBridge — Ship your Flutter app to TestFlight. No Mac required.</title>
-<meta name="description" content="MacBridge gives Flutter developers a production-ready iOS build environment in 60 seconds. No Mac purchase. No setup. Your choice of AI coding agent.">
+<title>MacBridge | iOS builds from Windows, without buying a Mac</title>
+<meta name="description" content="MacBridge gives Flutter teams a ready cloud macOS environment for iOS builds, TestFlight delivery, and AI-assisted development without owning or maintaining a Mac.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;650;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  /* =========================================================================
-     MacBridge — Maverix Labs Design System
-     Dark cinematic · glass panels · cyan signal · Manrope + IBM Plex Mono
-     ========================================================================= */
-
   :root {
-    /* Surface */
-    --surface-primary: #081017;
-    --surface-secondary: #0f1923;
-    --surface-elevated: #132435;
-    --surface-soft: #0c1824;
-
-    /* Text */
-    --text-primary: #edf4f7;
-    --text-secondary: #9eb6c7;
-    --text-tertiary: #72889b;
-
-    /* Border */
-    --border-default: rgba(133, 209, 244, 0.18);
-    --border-subtle: rgba(133, 209, 244, 0.08);
-
-    /* Accent */
-    --accent-primary: #59e0d0;
-    --accent-hover: #87efe1;
-
-    /* Status */
-    --status-success: #4fd89d;
-    --status-warning: #f0b45e;
-    --status-info: #75cfff;
-
-    /* Depth */
-    --depth-card: 1px solid var(--border-default);
-    --depth-featured: 1px solid rgba(89, 224, 208, 0.28);
-
-    /* Spacing */
-    --space-1: 4px; --space-2: 8px; --space-3: 12px;
-    --space-4: 16px; --space-5: 20px; --space-6: 24px;
-    --space-8: 32px; --space-10: 40px; --space-12: 48px;
-    --space-16: 64px; --space-20: 80px; --space-24: 96px;
-
-    /* Typography */
+    --bg: #071116;
+    --bg-deep: #050b0f;
+    --bg-elevated: #0d1a21;
+    --panel: rgba(13, 26, 33, 0.74);
+    --panel-strong: #10232c;
+    --panel-soft: rgba(8, 20, 26, 0.76);
+    --line: rgba(124, 224, 255, 0.16);
+    --line-strong: rgba(124, 224, 255, 0.34);
+    --text: #f2fbff;
+    --text-soft: #9ab5c0;
+    --text-muted: #6d8793;
+    --accent: #7ce0ff;
+    --accent-2: #7fffd4;
+    --accent-3: #d7fff4;
+    --warm: #ffb36b;
+    --danger: #ff8e8e;
+    --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+    --radius: 22px;
+    --radius-sm: 14px;
+    --max: 1240px;
+    --ease: 180ms ease;
+    --ease-slow: 420ms cubic-bezier(0.16, 1, 0.3, 1);
     --font-display: "Manrope", "Segoe UI", system-ui, sans-serif;
     --font-mono: "IBM Plex Mono", "Cascadia Code", ui-monospace, monospace;
-
-    /* Timing */
-    --ease-standard: 180ms ease;
-    --ease-emphasis: 420ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
   html {
-    font-size: 16px;
-    background: var(--surface-primary);
-    color: var(--text-primary);
-    font-family: var(--font-display);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
   }
 
   body {
     min-height: 100vh;
+    font-family: var(--font-display);
+    color: var(--text);
     background:
-      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(89, 224, 208, 0.06) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 50% at 80% 40%, rgba(117, 207, 255, 0.04) 0%, transparent 50%),
-      var(--surface-primary);
+      radial-gradient(circle at 10% 10%, rgba(124, 224, 255, 0.12), transparent 26%),
+      radial-gradient(circle at 84% 18%, rgba(127, 255, 212, 0.08), transparent 24%),
+      radial-gradient(circle at 50% 100%, rgba(124, 224, 255, 0.08), transparent 36%),
+      linear-gradient(180deg, #061015 0%, #081217 28%, #050b0f 100%);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* ── Typography ──────────────────────────────────────────────────────── */
+  a {
+    color: inherit;
+  }
 
-  .display { font-size: clamp(3rem, 7vw, 5.6rem); font-weight: 800; line-height: 0.94; letter-spacing: -0.05em; }
-  h1 { font-size: clamp(2.2rem, 4.5vw, 3.6rem); font-weight: 700; line-height: 1.02; letter-spacing: -0.04em; }
-  h2 { font-size: clamp(1.6rem, 2.5vw, 2.2rem); font-weight: 650; line-height: 1.08; letter-spacing: -0.03em; }
-  h3 { font-size: 1.25rem; font-weight: 650; line-height: 1.2; letter-spacing: -0.02em; }
-  .body-lg { font-size: 1.1rem; font-weight: 500; line-height: 1.65; color: var(--text-secondary); }
-  .body { font-size: 1rem; font-weight: 500; line-height: 1.7; color: var(--text-secondary); }
-  .body-sm { font-size: 0.875rem; font-weight: 500; line-height: 1.65; color: var(--text-tertiary); }
-  .caption { font-size: 0.75rem; font-weight: 600; line-height: 1.4; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); }
-  .overline { font-size: 0.7rem; font-weight: 700; line-height: 1.35; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-primary); }
-  .mono { font-family: var(--font-mono); font-weight: 500; }
+  img {
+    max-width: 100%;
+    display: block;
+  }
 
-  /* ── Layout ──────────────────────────────────────────────────────────── */
+  .skip-link {
+    position: absolute;
+    left: 16px;
+    top: -48px;
+    padding: 10px 14px;
+    background: var(--accent);
+    color: var(--bg-deep);
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 700;
+    z-index: 200;
+    transition: top var(--ease);
+  }
 
-  .container { max-width: 1200px; margin: 0 auto; padding: 0 var(--space-6); }
-  section { padding: var(--space-24) 0; }
+  .skip-link:focus {
+    top: 16px;
+  }
 
-  /* ── Top Bar ─────────────────────────────────────────────────────────── */
+  .shell {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shell::before,
+  .shell::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .shell::before {
+    background-image:
+      linear-gradient(rgba(124, 224, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124, 224, 255, 0.025) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent);
+  }
+
+  .shell::after {
+    background:
+      radial-gradient(circle at 50% 0%, rgba(124, 224, 255, 0.06), transparent 36%);
+  }
+
+  .container {
+    width: min(var(--max), calc(100% - 40px));
+    margin: 0 auto;
+  }
+
+  .eyebrow,
+  .meta,
+  .chip,
+  .stat-label,
+  .mini-title {
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--accent);
+    font-size: 0.73rem;
+    font-weight: 600;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 34px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent));
+  }
+
+  h1 {
+    font-size: clamp(3.2rem, 8vw, 6.6rem);
+    line-height: 0.92;
+    letter-spacing: -0.06em;
+    font-weight: 800;
+  }
+
+  h2 {
+    font-size: clamp(2rem, 4vw, 3.4rem);
+    line-height: 0.96;
+    letter-spacing: -0.05em;
+    font-weight: 750;
+  }
+
+  h3 {
+    font-size: 1.12rem;
+    line-height: 1.16;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    color: var(--text-soft);
+    line-height: 1.7;
+  }
+
+  section {
+    padding: 110px 0;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
 
   .topbar {
-    position: sticky; top: 0; z-index: 100;
-    background: rgba(8, 16, 23, 0.82);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-bottom: 1px solid var(--border-subtle);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    background: rgba(6, 14, 18, 0.68);
+    border-bottom: 1px solid rgba(124, 224, 255, 0.08);
   }
+
   .topbar .container {
-    display: flex; align-items: center; justify-content: space-between;
-    height: 56px;
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
   }
-  .topbar-brand {
-    display: flex; align-items: center; gap: var(--space-3);
-    font-weight: 700; font-size: 1.05rem; letter-spacing: -0.02em;
-  }
-  .topbar-brand-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--accent-primary);
-    box-shadow: 0 0 10px rgba(89, 224, 208, 0.5), 0 0 4px rgba(89, 224, 208, 0.3);
-  }
-  .topbar-links { display: flex; gap: var(--space-6); align-items: center; }
-  .topbar-links a {
-    color: var(--text-secondary); text-decoration: none;
-    font-size: 0.875rem; font-weight: 500;
-    transition: color var(--ease-standard);
-  }
-  .topbar-links a:hover { color: var(--text-primary); }
 
-  /* ── CTA Button ──────────────────────────────────────────────────────── */
-
-  .cta {
-    display: inline-flex; align-items: center; gap: var(--space-2);
-    padding: var(--space-3) var(--space-6);
-    background: var(--accent-primary); color: #081017;
-    font-family: var(--font-display); font-size: 0.95rem; font-weight: 700;
-    border: none; border-radius: 8px; cursor: pointer;
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
     text-decoration: none;
-    transition: transform var(--ease-standard), background var(--ease-standard), box-shadow var(--ease-standard);
-  }
-  .cta:hover {
-    background: var(--accent-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 0 24px rgba(89, 224, 208, 0.25), 0 4px 16px rgba(89, 224, 208, 0.12);
-  }
-  .cta:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
-  .cta-secondary {
-    background: transparent; color: var(--accent-primary);
-    border: 1px solid rgba(89, 224, 208, 0.25);
-  }
-  .cta-secondary:hover {
-    background: rgba(89, 224, 208, 0.06);
-    box-shadow: 0 0 16px rgba(89, 224, 208, 0.12);
-  }
-  .cta-arrow { font-size: 1.1rem; transition: transform var(--ease-standard); }
-  .cta:hover .cta-arrow { transform: translateX(3px); }
-
-  /* ── Hero ────────────────────────────────────────────────────────────── */
-
-  .hero {
-    padding: var(--space-24) 0 var(--space-20);
-    text-align: center;
-    position: relative;
-  }
-  .hero::before {
-    content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 700px; height: 400px;
-    background: radial-gradient(ellipse, rgba(89, 224, 208, 0.07) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .hero .overline { margin-bottom: var(--space-4); display: inline-block; }
-  .hero .display { margin-bottom: var(--space-6); position: relative; }
-  .hero .display em {
-    font-style: normal;
-    background: linear-gradient(135deg, var(--accent-primary) 0%, #75cfff 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .hero .body-lg { max-width: 580px; margin: 0 auto var(--space-8); }
-  .hero-actions { display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap; }
-
-  /* ── Signal Rail ─────────────────────────────────────────────────────── */
-
-  .signal-rail {
-    display: inline-flex; flex-wrap: wrap; gap: var(--space-3);
-    justify-content: center; margin-top: var(--space-8);
-  }
-  .signal-pill {
-    display: inline-flex; align-items: center; gap: var(--space-2);
-    padding: var(--space-1) var(--space-4);
-    background: var(--surface-soft); color: var(--text-secondary);
-    border: 1px solid var(--border-subtle); border-radius: 100px;
-    font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500;
-  }
-  .signal-pill .dot {
-    width: 6px; height: 6px; border-radius: 50%; background: var(--status-success);
-    box-shadow: 0 0 6px rgba(79, 216, 157, 0.5);
   }
 
-  /* ── Glass Card ──────────────────────────────────────────────────────── */
-
-  .glass-card {
-    background: var(--surface-secondary);
-    border: var(--depth-card);
+  .brand-mark {
+    width: 38px;
+    height: 38px;
     border-radius: 12px;
-    padding: var(--space-8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: transform var(--ease-standard), border-color var(--ease-standard);
-  }
-  .glass-card:hover {
-    border-color: rgba(133, 209, 244, 0.32);
-    transform: translateY(-2px);
-  }
-  .glass-card-featured {
-    border: var(--depth-featured);
-    background: var(--surface-elevated);
-    box-shadow: 0 0 32px rgba(89, 224, 208, 0.06);
+    display: grid;
+    place-items: center;
+    background:
+      linear-gradient(135deg, rgba(124, 224, 255, 0.22), rgba(127, 255, 212, 0.1)),
+      rgba(15, 32, 41, 0.72);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
-  /* ── Section Header ──────────────────────────────────────────────────── */
+  .brand-mark::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 18px rgba(124, 224, 255, 0.45);
+  }
 
-  .section-header { text-align: center; margin-bottom: var(--space-16); }
-  .section-header .overline { margin-bottom: var(--space-3); display: inline-block; }
-  .section-header h2 { margin-bottom: var(--space-4); }
-  .section-header .body-lg { max-width: 520px; margin: 0 auto; }
+  .brand-copy strong {
+    display: block;
+    font-size: 1rem;
+    letter-spacing: -0.03em;
+  }
 
-  /* ── Problem / Comparison ────────────────────────────────────────────── */
-
-  .comparison-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);
-    max-width: 800px; margin: 0 auto;
-  }
-  .comparison-card { padding: var(--space-8); border-radius: 12px; }
-  .comparison-card.bad {
-    background: rgba(239, 123, 123, 0.04);
-    border: 1px solid rgba(239, 123, 123, 0.15);
-  }
-  .comparison-card.good {
-    background: rgba(79, 216, 157, 0.04);
-    border: 1px solid rgba(79, 216, 157, 0.2);
-  }
-  .comparison-card h3 { margin-bottom: var(--space-4); }
-  .comparison-card .time {
-    font-family: var(--font-mono); font-size: 2.5rem; font-weight: 600;
-    line-height: 1; margin-bottom: var(--space-2);
-  }
-  .comparison-card.bad .time { color: #ef7b7b; }
-  .comparison-card.good .time { color: var(--status-success); }
-  .comparison-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: var(--space-6); }
-  .check-list { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
-  .check-list li { font-size: 0.875rem; color: var(--text-secondary); padding-left: var(--space-6); position: relative; }
-  .check-list li::before { content: '✕'; position: absolute; left: 0; color: #ef7b7b; font-weight: 700; }
-  .check-list.good li::before { content: '✓'; color: var(--status-success); }
-  .check-list li.dim { color: var(--text-tertiary); }
-  .check-list li.dim::before { color: var(--text-tertiary); }
-
-  /* ── Steps ───────────────────────────────────────────────────────────── */
-
-  .steps-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6);
-    counter-reset: step;
-  }
-  .step-card {
-    background: var(--surface-secondary);
-    border: var(--depth-card);
-    border-radius: 12px;
-    padding: var(--space-8);
-    position: relative;
-    transition: border-color var(--ease-standard), transform var(--ease-standard);
-  }
-  .step-card:hover {
-    border-color: rgba(133, 209, 244, 0.32);
-    transform: translateY(-2px);
-  }
-  .step-number {
-    font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600;
-    color: var(--accent-primary); margin-bottom: var(--space-4);
+  .brand-copy span {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
     letter-spacing: 0.08em;
   }
-  .step-card h3 { margin-bottom: var(--space-3); }
-  .step-card .body-sm { margin: 0; }
-  .step-arrow {
-    display: none; /* replaced by visual flow on desktop */
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 26px;
   }
 
-  /* ── Environment Grid ────────────────────────────────────────────────── */
+  .nav a {
+    text-decoration: none;
+    color: var(--text-soft);
+    font-size: 0.92rem;
+    transition: color var(--ease);
+  }
 
-  .env-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4);
+  .nav a:hover,
+  .nav a:focus-visible {
+    color: var(--text);
   }
-  .env-card {
-    background: var(--surface-secondary);
-    border: var(--depth-card);
-    border-radius: 12px;
-    padding: var(--space-6);
-    text-align: center;
-    transition: border-color var(--ease-standard), transform var(--ease-standard);
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    text-decoration: none;
+    font-weight: 700;
+    transition:
+      transform var(--ease),
+      border-color var(--ease),
+      background var(--ease),
+      color var(--ease),
+      box-shadow var(--ease);
   }
-  .env-card:hover {
-    border-color: rgba(133, 209, 244, 0.28);
+
+  .button:hover {
     transform: translateY(-1px);
   }
-  .env-card-icon {
-    font-size: 1.5rem; margin-bottom: var(--space-3);
-    filter: grayscale(0.1);
-  }
-  .env-card h3 { font-size: 1rem; margin-bottom: var(--space-1); font-weight: 650; }
-  .env-card .version {
-    font-family: var(--font-mono); font-size: 0.7rem; font-weight: 500;
-    color: var(--status-success);
+
+  .button:focus-visible,
+  .nav a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
   }
 
-  /* ── Agent cards ─────────────────────────────────────────────────────── */
+  .button-primary {
+    color: var(--bg-deep);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 12px 30px rgba(124, 224, 255, 0.18);
+  }
 
-  .agents-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6);
-    max-width: 720px; margin: var(--space-12) auto 0;
+  .button-primary:hover {
+    box-shadow: 0 18px 34px rgba(124, 224, 255, 0.24);
   }
-  .agent-card {
-    background: var(--surface-secondary);
-    border: var(--depth-card);
-    border-radius: 12px;
-    padding: var(--space-6);
-    text-align: center;
-    transition: border-color var(--ease-standard), transform var(--ease-standard);
-  }
-  .agent-card:hover {
-    border-color: rgba(133, 209, 244, 0.32);
-    transform: translateY(-2px);
-  }
-  .agent-card .overline { margin-bottom: var(--space-3); display: block; }
-  .agent-card .agent-name { font-size: 1.1rem; font-weight: 700; margin-bottom: var(--space-1); }
-  .agent-card .agent-desc { font-size: 0.8rem; color: var(--text-tertiary); }
 
-  /* ── Pricing ─────────────────────────────────────────────────────────── */
-
-  .pricing-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);
-    max-width: 800px; margin: 0 auto;
+  .button-secondary {
+    color: var(--text);
+    background: rgba(124, 224, 255, 0.04);
+    border-color: rgba(124, 224, 255, 0.2);
   }
-  .pricing-card {
-    background: var(--surface-secondary);
-    border: var(--depth-card);
+
+  .hero {
+    padding-top: 56px;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+    gap: 34px;
+    align-items: stretch;
+  }
+
+  .hero-copy {
+    padding: 34px 0 20px;
+  }
+
+  .hero-copy p {
+    margin-top: 28px;
+    max-width: 650px;
+    font-size: 1.1rem;
+  }
+
+  .hero-copy .accent-line {
+    color: var(--accent-3);
+    display: block;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 34px;
+  }
+
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(124, 224, 255, 0.16);
+    background: rgba(10, 20, 26, 0.58);
+    color: var(--text-soft);
+    font-size: 0.72rem;
+  }
+
+  .chip::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 16px rgba(124, 224, 255, 0.46);
+  }
+
+  .hero-stack {
+    display: grid;
+    gap: 18px;
+  }
+
+  .hero-card {
+    padding: 24px;
+  }
+
+  .status-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .status-box {
+    padding: 14px;
     border-radius: 16px;
-    padding: var(--space-10);
-    text-align: center;
-    transition: border-color var(--ease-standard), transform var(--ease-standard);
+    background: linear-gradient(180deg, rgba(124, 224, 255, 0.08), rgba(124, 224, 255, 0.03));
+    border: 1px solid rgba(124, 224, 255, 0.14);
   }
-  .pricing-card:hover { transform: translateY(-2px); }
-  .pricing-card-featured {
-    border: var(--depth-featured);
-    background: var(--surface-elevated);
-    box-shadow: 0 0 32px rgba(89, 224, 208, 0.06);
+
+  .status-box strong {
+    display: block;
+    font-size: 1.02rem;
+    letter-spacing: -0.03em;
+  }
+
+  .status-box span {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 0.73rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .console {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+      rgba(5, 12, 16, 0.94);
+    border: 1px solid rgba(124, 224, 255, 0.14);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .console-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(124, 224, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .console-dots {
+    display: flex;
+    gap: 8px;
+  }
+
+  .console-dots span {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .console-label {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .console-body {
+    padding: 18px 16px 20px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.8;
+    color: #cde8f1;
+  }
+
+  .console-row {
+    display: flex;
+    gap: 14px;
+    white-space: nowrap;
+  }
+
+  .console-key {
+    color: var(--accent);
+  }
+
+  .console-ok {
+    color: var(--accent-2);
+  }
+
+  .console-note {
+    color: var(--text-muted);
+  }
+
+  .hero-footer {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .hero-footer .panel {
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  .mini-title {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .hero-footer p {
+    font-size: 0.95rem;
+  }
+
+  .section-head {
+    display: grid;
+    gap: 18px;
+    margin-bottom: 42px;
+    max-width: 760px;
+  }
+
+  .section-head p {
+    font-size: 1.04rem;
+  }
+
+  .proof-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 24px;
+  }
+
+  .proof-card,
+  .proof-list,
+  .flow-card,
+  .pricing-card,
+  .final-card {
+    padding: 28px;
+  }
+
+  .compare {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .compare-block {
+    padding: 18px;
+    border-radius: 18px;
+    min-height: 100%;
+  }
+
+  .compare-block.bad {
+    background: rgba(255, 142, 142, 0.05);
+    border: 1px solid rgba(255, 142, 142, 0.14);
+  }
+
+  .compare-block.good {
+    background: rgba(127, 255, 212, 0.05);
+    border: 1px solid rgba(127, 255, 212, 0.16);
+  }
+
+  .stat {
+    display: block;
+    margin: 10px 0 6px;
+    font-size: 2.4rem;
+    line-height: 1;
+    letter-spacing: -0.06em;
+    font-weight: 800;
+  }
+
+  .bad .stat {
+    color: var(--danger);
+  }
+
+  .good .stat {
+    color: var(--accent-2);
+  }
+
+  .stat-label {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .proof-list ul,
+  .pricing-points,
+  .content-list {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .proof-list li,
+  .pricing-points li,
+  .content-list li {
     position: relative;
+    padding-left: 22px;
+    color: var(--text-soft);
+    line-height: 1.6;
   }
-  .pricing-badge {
-    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-    background: var(--accent-primary); color: #081017;
-    font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700;
-    padding: 4px 14px; border-radius: 100px;
-    letter-spacing: 0.06em; text-transform: uppercase;
-  }
-  .pricing-card .overline { margin-bottom: var(--space-2); display: inline-block; }
-  .pricing-card .price {
-    font-family: var(--font-mono); font-size: 2.8rem; font-weight: 600;
-    color: var(--accent-primary); line-height: 1; margin-bottom: var(--space-1);
-  }
-  .pricing-card .price-period { font-size: 0.85rem; color: var(--text-tertiary); margin-bottom: var(--space-6); }
-  .pricing-card .check-list { margin-bottom: var(--space-8); }
-  .pricing-card .check-list.good li { font-size: 0.85rem; }
 
-  /* ── Footer ──────────────────────────────────────────────────────────── */
-
-  .cta-section {
-    text-align: center; padding: var(--space-24) 0;
-    background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(89, 224, 208, 0.05) 0%, transparent 60%);
+  .proof-list li::before,
+  .pricing-points li::before,
+  .content-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 11px;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 12px rgba(124, 224, 255, 0.3);
   }
-  .cta-section h2 { margin-bottom: var(--space-4); }
-  .cta-section .body-lg { max-width: 480px; margin: 0 auto var(--space-8); }
-  .cta-section .signal-rail { margin-top: var(--space-8); }
+
+  .relief-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .relief-card {
+    padding: 22px;
+    min-height: 210px;
+  }
+
+  .relief-card strong {
+    display: block;
+    margin-bottom: 14px;
+    font-size: 1.06rem;
+    letter-spacing: -0.03em;
+  }
+
+  .relief-card p {
+    font-size: 0.95rem;
+  }
+
+  .flow-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .flow-card {
+    position: relative;
+    min-height: 248px;
+  }
+
+  .flow-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    background: rgba(124, 224, 255, 0.08);
+    border: 1px solid rgba(124, 224, 255, 0.18);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .flow-card p {
+    margin-top: 14px;
+    font-size: 0.95rem;
+  }
+
+  .tooling-grid {
+    display: grid;
+    grid-template-columns: 1.08fr 0.92fr;
+    gap: 24px;
+  }
+
+  .tool-cluster {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-top: 24px;
+  }
+
+  .tool-card {
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(124, 224, 255, 0.03);
+    border: 1px solid rgba(124, 224, 255, 0.12);
+  }
+
+  .tool-card strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.98rem;
+  }
+
+  .tool-card span {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .agent-grid {
+    display: grid;
+    gap: 14px;
+    margin-top: 24px;
+  }
+
+  .agent-card {
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(127, 255, 212, 0.03);
+    border: 1px solid rgba(127, 255, 212, 0.12);
+  }
+
+  .agent-card strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.98rem;
+  }
+
+  .agent-card p {
+    font-size: 0.92rem;
+  }
+
+  .pricing-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(340px, 0.66fr);
+    gap: 24px;
+    align-items: stretch;
+  }
+
+  .pricing-notes {
+    display: grid;
+    gap: 16px;
+  }
+
+  .pricing-note {
+    padding: 22px;
+  }
+
+  .price {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    margin: 20px 0 14px;
+  }
+
+  .price strong {
+    font-size: 4.2rem;
+    line-height: 0.9;
+    letter-spacing: -0.08em;
+    color: var(--accent);
+  }
+
+  .price span {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-bottom: 10px;
+  }
+
+  .pricing-card .button {
+    width: 100%;
+    margin-top: 24px;
+  }
+
+  .final-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 24px;
+    align-items: center;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(124, 224, 255, 0.12), transparent 34%),
+      linear-gradient(135deg, rgba(13, 26, 33, 0.96), rgba(8, 16, 22, 0.94));
+  }
+
+  .final-card p {
+    max-width: 640px;
+    font-size: 1.04rem;
+  }
+
+  .final-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-end;
+  }
 
   footer {
-    border-top: 1px solid var(--border-subtle);
-    padding: var(--space-8) 0;
-    text-align: center;
+    padding: 30px 0 44px;
+    border-top: 1px solid rgba(124, 224, 255, 0.08);
   }
-  footer .container {
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  footer .body-sm { margin: 0; }
-  footer .mono { color: var(--text-tertiary); }
 
-  /* ── Responsive ──────────────────────────────────────────────────────── */
-
-  @media (max-width: 768px) {
-    .comparison-grid { grid-template-columns: 1fr; }
-    .steps-grid { grid-template-columns: 1fr; }
-    .env-grid { grid-template-columns: repeat(2, 1fr); }
-    .agents-grid { grid-template-columns: 1fr; }
-    section { padding: var(--space-16) 0; }
-    .hero { padding: var(--space-16) 0 var(--space-12); }
-    footer .container { flex-direction: column; gap: var(--space-3); }
+  .footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
   }
-  @media (max-width: 480px) {
-    .env-grid { grid-template-columns: 1fr; }
-    .topbar-links { display: none; }
+
+  .footer-row p,
+  .footer-row span {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .footer-row strong {
+    color: var(--text-soft);
+  }
+
+  @media (max-width: 1120px) {
+    .hero-grid,
+    .proof-grid,
+    .tooling-grid,
+    .pricing-wrap,
+    .final-card {
+      grid-template-columns: 1fr;
+    }
+
+    .relief-grid,
+    .flow-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .final-actions {
+      justify-content: flex-start;
+    }
+  }
+
+  @media (max-width: 860px) {
+    section {
+      padding: 86px 0;
+    }
+
+    .topbar .container {
+      min-height: 64px;
+    }
+
+    .nav {
+      display: none;
+    }
+
+    .status-strip,
+    .compare,
+    .hero-footer,
+    .tool-cluster {
+      grid-template-columns: 1fr;
+    }
+
+    .relief-grid,
+    .flow-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .container {
+      width: min(var(--max), calc(100% - 24px));
+    }
+
+    h1 {
+      font-size: clamp(2.8rem, 16vw, 4.6rem);
+    }
+
+    h2 {
+      font-size: clamp(1.8rem, 9vw, 2.6rem);
+    }
+
+    .hero {
+      padding-top: 36px;
+    }
+
+    .hero-copy p,
+    .section-head p,
+    .final-card p {
+      font-size: 1rem;
+    }
+
+    .hero-card,
+    .proof-card,
+    .proof-list,
+    .flow-card,
+    .pricing-card,
+    .pricing-note,
+    .final-card {
+      padding: 22px;
+    }
+
+    .footer-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
   }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="shell">
+  <nav class="topbar">
+    <div class="container">
+      <a class="brand" href="#top" aria-label="MacBridge home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-copy">
+          <strong>MacBridge</strong>
+          <span>Cloud macOS for shipping iOS</span>
+        </span>
+      </a>
+      <div class="nav">
+        <a href="#why">Why it works</a>
+        <a href="#flow">How it works</a>
+        <a href="#tooling">Environment</a>
+        <a href="#pricing">Pricing</a>
+        <a class="button button-secondary" href="#cta">Join beta</a>
+      </div>
+    </div>
+  </nav>
 
-<!-- ── Top Bar ──────────────────────────────────────────────────────────── -->
-<nav class="topbar">
-  <div class="container">
-    <div class="topbar-brand">
-      <span class="topbar-brand-dot"></span>
-      MacBridge
-    </div>
-    <div class="topbar-links">
-      <a href="#how-it-works">How it works</a>
-      <a href="#environment">Environment</a>
-      <a href="#pricing">Pricing</a>
-      <a href="#cta" class="cta cta-secondary" style="padding: var(--space-2) var(--space-4); font-size: 0.8rem;">Start building</a>
-    </div>
-  </div>
-</nav>
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">MacBridge for Flutter teams</span>
+          <h1>
+            iOS builds from Windows,
+            <span class="accent-line">without buying or babysitting a Mac.</span>
+          </h1>
+          <p>
+            MacBridge gives you a ready cloud macOS environment with Xcode, CocoaPods,
+            Flutter, and AI coding agents already working, so your team can connect,
+            build, archive, and ship to TestFlight without turning setup into the project.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#cta">Join the MacBridge beta</a>
+            <a class="button button-secondary" href="#flow">See the build flow</a>
+          </div>
+          <div class="hero-meta">
+            <span class="chip">No Mac purchase</span>
+            <span class="chip">No Xcode setup</span>
+            <span class="chip">SSH and GUI access</span>
+            <span class="chip">TestFlight-ready workflow</span>
+          </div>
+        </div>
 
-<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
-<section class="hero">
-  <div class="container">
-    <span class="overline">MacBridge</span>
-    <h1 class="display">Ship your Flutter app<br>to <em>TestFlight.</em><br>No Mac required.</h1>
-    <p class="body-lg">A production-ready iOS build environment in 60 seconds. Xcode, Flutter, CocoaPods, and your choice of AI coding agent — pre-installed and verified. No setup. No provisioning hell.</p>
-    <div class="hero-actions">
-      <a href="#cta" class="cta">Join the beta <span class="cta-arrow">→</span></a>
-      <a href="#how-it-works" class="cta cta-secondary">See how it works</a>
-    </div>
-    <div class="signal-rail">
-      <span class="signal-pill"><span class="dot"></span> Xcode 26.6</span>
-      <span class="signal-pill"><span class="dot"></span> Flutter 3.44.4</span>
-      <span class="signal-pill"><span class="dot"></span> Claude Code</span>
-      <span class="signal-pill"><span class="dot"></span> OpenCode</span>
-      <span class="signal-pill"><span class="dot"></span> Codex</span>
-    </div>
-  </div>
-</section>
+        <div class="hero-stack">
+          <div class="hero-card panel">
+            <div class="status-strip">
+              <div class="status-box">
+                <strong>Ready</strong>
+                <span>Xcode stack online</span>
+              </div>
+              <div class="status-box">
+                <strong>Fast</strong>
+                <span>Fresh environment path</span>
+              </div>
+              <div class="status-box">
+                <strong>Flexible</strong>
+                <span>Agent choice preserved</span>
+              </div>
+            </div>
 
-<!-- ── What MacBridge Removes ───────────────────────────────────────────── -->
-<section id="problem">
-  <div class="container">
-    <div class="section-header">
-      <span class="overline">The Problem</span>
-      <h2>You shouldn't need to become a macOS administrator to ship an iOS app.</h2>
-      <p class="body-lg">Phase 0 taught us that provisioning a cloud Mac for Flutter development takes 2 hours and 30+ manual commands. MacBridge makes it zero.</p>
-    </div>
-    <div class="comparison-grid">
-      <div class="comparison-card bad">
-        <div class="comparison-label">Without MacBridge</div>
-        <div class="time">~2 hours</div>
-        <p class="body-sm" style="margin-bottom: var(--space-4);">Manual provisioning. Every time.</p>
-        <ul class="check-list">
-          <li>SSH into raw Mac</li>
-          <li>Install Xcode (45 min, GUI required)</li>
-          <li>Accept license &amp; run first launch</li>
-          <li>Download iOS Simulator runtime</li>
-          <li>Install Homebrew + fix PATH</li>
-          <li>Install Flutter, Ruby, CocoaPods</li>
-          <li>Fix CocoaPods Ruby version conflict</li>
-          <li>Generate SSH keys for GitHub</li>
-          <li>Install AI agent CLIs + tmux</li>
-          <li class="dim">Debug silent failures for 45 min</li>
-        </ul>
-      </div>
-      <div class="comparison-card good">
-        <div class="comparison-label">With MacBridge</div>
-        <div class="time">60 seconds</div>
-        <p class="body-sm" style="margin-bottom: var(--space-4);">Receive credentials. Start building.</p>
-        <ul class="check-list good">
-          <li>Sign up &amp; choose your stack</li>
-          <li>Receive SSH + DeskIn credentials</li>
-          <li>Connect — everything is ready</li>
-          <li>Clone your project</li>
-          <li>Run <span class="mono" style="color: var(--accent-primary);">flutter build ios</span></li>
-          <li>Upload to TestFlight</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
+            <div class="console" aria-label="MacBridge environment status">
+              <div class="console-top">
+                <div class="console-dots" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="console-label">Build Surface / macbridge ready state</div>
+              </div>
+              <div class="console-body">
+                <div class="console-row"><span class="console-key">$ target</span><span>flutter build ios</span></div>
+                <div class="console-row"><span class="console-key">$ environment</span><span class="console-ok">ready</span></div>
+                <div class="console-row"><span class="console-key">$ xcode</span><span class="console-ok">installed and verified</span></div>
+                <div class="console-row"><span class="console-key">$ pods</span><span class="console-ok">resolved</span></div>
+                <div class="console-row"><span class="console-key">$ agents</span><span>Claude Code / OpenCode / Codex</span></div>
+                <div class="console-row"><span class="console-key">$ outcome</span><span class="console-note">connect, build, archive, deliver</span></div>
+              </div>
+            </div>
+          </div>
 
-<!-- ── How It Works ─────────────────────────────────────────────────────── -->
-<section id="how-it-works">
-  <div class="container">
-    <div class="section-header">
-      <span class="overline">How It Works</span>
-      <h2>From sign-up to shipping in three steps.</h2>
-      <p class="body-lg">Provisioning happens before you see the Mac. You receive an environment that's already verified and ready.</p>
-    </div>
-    <div class="steps-grid">
-      <div class="step-card">
-        <div class="step-number">01 / SIGN UP</div>
-        <h3>Choose your stack</h3>
-        <p class="body-sm">Pick Flutter, React Native, or Native iOS. Choose your AI agent — Claude Code, OpenCode, or Codex. Pay once. <span class="mono" style="color: var(--text-tertiary);">~2 minutes</span></p>
+          <div class="hero-footer">
+            <div class="panel">
+              <span class="mini-title">What you buy</span>
+              <p>A prepared iOS build workflow, not another pile of setup instructions.</p>
+            </div>
+            <div class="panel">
+              <span class="mini-title">What stays yours</span>
+              <p>Your repo, your agent preference, your shipping process, your release timing.</p>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="step-card">
-        <div class="step-number">02 / RECEIVE</div>
-        <h3>Get your credentials</h3>
-        <p class="body-sm">Email arrives with SSH keys, DeskIn access, and a verified environment report. Every tool confirmed. Every check green. <span class="mono" style="color: var(--text-tertiary);">Instant</span></p>
-      </div>
-      <div class="step-card">
-        <div class="step-number">03 / BUILD</div>
-        <h3>Start coding immediately</h3>
-        <p class="body-sm">SSH in. Clone your repo. Run your agent. Build for iOS. Ship to TestFlight. The Mac disappears — you just build. <span class="mono" style="color: var(--text-tertiary);">5 minutes to first build</span></p>
-      </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- ── Environment ──────────────────────────────────────────────────────── -->
-<section id="environment">
-  <div class="container">
-    <div class="section-header">
-      <span class="overline">Environment</span>
-      <h2>Everything pre-installed. Nothing to configure.</h2>
-      <p class="body-lg">Every tool verified at every layer before you log in. The golden image means zero-setup for every new Mac.</p>
-    </div>
-    <div class="env-grid">
-      <div class="env-card">
-        <div class="env-card-icon">🍎</div>
-        <h3>Xcode</h3>
-        <span class="version">26.6</span>
-      </div>
-      <div class="env-card">
-        <div class="env-card-icon">💙</div>
-        <h3>Flutter</h3>
-        <span class="version">3.44.4</span>
-      </div>
-      <div class="env-card">
-        <div class="env-card-icon">📦</div>
-        <h3>CocoaPods</h3>
-        <span class="version">1.16.2</span>
-      </div>
-      <div class="env-card">
-        <div class="env-card-icon">💎</div>
-        <h3>Ruby</h3>
-        <span class="version">4.x (Homebrew)</span>
-      </div>
-      <div class="env-card">
-        <div class="env-card-icon">🟢</div>
-        <h3>Node.js</h3>
-        <span class="version">22 LTS</span>
-      </div>
-      <div class="env-card">
-        <div class="env-card-icon">🍺</div>
-        <h3>Homebrew</h3>
-        <span class="version">latest</span>
-      </div>
-      <div class="env-card">
-        <div class="env-card-icon">🔑</div>
-        <h3>GitHub CLI</h3>
-        <span class="version">gh</span>
-      </div>
-      <div class="env-card">
-        <div class="env-card-icon">📱</div>
-        <h3>iOS Simulator</h3>
-        <span class="version">26.5</span>
-      </div>
-    </div>
+    <section id="why">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Why MacBridge</span>
+          <h2>The friction is not iOS development. The friction is everything around it.</h2>
+          <p>
+            Most teams do not fail because Flutter cannot build for iPhone. They lose time
+            because Apple tooling, machine setup, and environment drift become their side job.
+            MacBridge removes that layer so the work returns to shipping product.
+          </p>
+        </div>
 
-    <div class="agents-grid">
-      <div class="agent-card">
-        <span class="overline">Claude Code</span>
-        <div class="agent-name">Architecture &amp; complex debugging</div>
-        <p class="agent-desc">Anthropic's agent for hard problems. Pre-installed via npm.</p>
-      </div>
-      <div class="agent-card">
-        <span class="overline">OpenCode</span>
-        <div class="agent-name">Dual-mode builder &amp; auditor</div>
-        <p class="agent-desc">Primary work environment. Orchestrates, builds, mines sessions.</p>
-      </div>
-      <div class="agent-card">
-        <span class="overline">Codex</span>
-        <div class="agent-name">Rapid iteration &amp; design</div>
-        <p class="agent-desc">OpenAI's CLI agent. Fast prototyping and iteration loops.</p>
-      </div>
-    </div>
-  </div>
-</section>
+        <div class="proof-grid">
+          <div class="proof-card panel">
+            <h3>From infrastructure chore to usable build surface</h3>
+            <div class="compare">
+              <div class="compare-block bad">
+                <span class="stat-label">Without MacBridge</span>
+                <span class="stat">Hours lost</span>
+                <p>Raw machine setup, Xcode friction, CocoaPods drift, broken paths, and repeated environment debugging.</p>
+              </div>
+              <div class="compare-block good">
+                <span class="stat-label">With MacBridge</span>
+                <span class="stat">Build focus</span>
+                <p>Connect to a prepared environment, clone the repo, run the build, and move toward TestFlight.</p>
+              </div>
+            </div>
+          </div>
 
-<!-- ── Pricing ──────────────────────────────────────────────────────────── -->
-<section id="pricing">
-  <div class="container">
-    <div class="section-header">
-      <span class="overline">Pricing</span>
-      <h2>Two tiers. Your choice of agent.</h2>
-    </div>
-    <div class="pricing-grid">
-      <!-- Vanilla -->
-      <div class="pricing-card">
-        <span class="overline">Vanilla</span>
-        <div class="price">$19<span style="font-size: 0.9rem;">/mo</span></div>
-        <p class="price-period">For traditional Flutter devs. "Just give me a Mac that works."</p>
-        <ul class="check-list good" style="text-align: left;">
-          <li>Production-ready macOS environment</li>
-          <li>Xcode 26.6 + iOS Simulator</li>
-          <li>Flutter, CocoaPods, Ruby, Homebrew</li>
-          <li>Git + GitHub CLI</li>
-          <li>SSH + DeskIn GUI access</li>
-          <li>Golden image — fresh Mac in 60s</li>
-          <li>Auto-stop after 15 min idle</li>
-        </ul>
-        <a href="#cta" class="cta cta-secondary" style="width: 100%; justify-content: center;">Start building <span class="cta-arrow">→</span></a>
+          <div class="proof-list panel">
+            <span class="mini-title">What changes</span>
+            <h3>MacBridge removes the recurring blockers</h3>
+            <ul>
+              <li>No Mac purchase just to unlock iOS output.</li>
+              <li>No first-day Xcode and simulator setup spiral.</li>
+              <li>No repeated toolchain maintenance every time the environment resets.</li>
+              <li>No forced agent lock-in if your team already has a preferred workflow.</li>
+              <li>No paying attention to the machine when you should be paying attention to the release.</li>
+            </ul>
+          </div>
+        </div>
       </div>
-      <!-- Agent -->
-      <div class="pricing-card pricing-card-featured">
-        <span class="pricing-badge">Most Popular</span>
-        <span class="overline">Agent</span>
-        <div class="price">$39<span style="font-size: 0.9rem;">/mo</span></div>
-        <p class="price-period">For vibe coders. "Give me a Mac with my AI assistant ready."</p>
-        <ul class="check-list good" style="text-align: left;">
-          <li>Everything in Vanilla</li>
-          <li>Claude Code pre-installed</li>
-          <li>OpenCode pre-installed</li>
-          <li>Codex CLI pre-installed</li>
-          <li>tmux session persistence</li>
-          <li>Cross-device (laptop → phone)</li>
-          <li>Flutter/Firebase/iOS skill library</li>
-          <li>Agent-ready — type and code</li>
-        </ul>
-        <a href="#cta" class="cta" style="width: 100%; justify-content: center;">Start building <span class="cta-arrow">→</span></a>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Relief Layer</span>
+          <h2>Built for the exact things Windows-based Flutter teams do not want to own.</h2>
+        </div>
+        <div class="relief-grid">
+          <div class="relief-card panel">
+            <strong>Apple toolchain complexity</strong>
+            <p>Xcode and the surrounding iOS tooling are prepared before you arrive, so setup does not become the first sprint.</p>
+          </div>
+          <div class="relief-card panel">
+            <strong>Environment drift</strong>
+            <p>The experience is designed around a controlled build surface instead of a machine that slowly becomes unique and fragile.</p>
+          </div>
+          <div class="relief-card panel">
+            <strong>Workflow interruption</strong>
+            <p>SSH and remote desktop access let you stay inside a practical build path instead of switching devices and re-learning habits.</p>
+          </div>
+          <div class="relief-card panel">
+            <strong>AI-agent fragmentation</strong>
+            <p>You are not asked to change how you work just to get iOS output. The environment supports agent-assisted development as part of the workflow.</p>
+          </div>
+        </div>
       </div>
+    </section>
+
+    <section id="flow">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">How It Works</span>
+          <h2>A short path from account to TestFlight.</h2>
+          <p>
+            The public promise is simple: provisioning happens off-stage. You receive access
+            to an environment that is meant to be used, not assembled.
+          </p>
+        </div>
+        <div class="flow-grid">
+          <div class="flow-card panel">
+            <span class="flow-index">01</span>
+            <h3>Choose the workflow</h3>
+            <p>Select the setup that matches your stack and your preferred way of building. The product centers the workflow, not the machine.</p>
+          </div>
+          <div class="flow-card panel">
+            <span class="flow-index">02</span>
+            <h3>Receive secure access</h3>
+            <p>Get the connection details for a prepared macOS environment with the required iOS tooling already in place.</p>
+          </div>
+          <div class="flow-card panel">
+            <span class="flow-index">03</span>
+            <h3>Connect and build</h3>
+            <p>Open the environment through SSH or GUI, pull your repository, run your coding workflow, and produce the iOS build.</p>
+          </div>
+          <div class="flow-card panel">
+            <span class="flow-index">04</span>
+            <h3>Ship and step away</h3>
+            <p>Archive, sign when needed, move toward TestFlight, then return later without treating the machine itself as the product.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tooling">
+      <div class="container tooling-grid">
+        <div class="proof-card panel">
+          <span class="eyebrow">Prepared Environment</span>
+          <h2>Everything needed for the iOS path, already assembled.</h2>
+          <p>
+            The landing page does not need to dump internal bootstrap detail, but it should
+            communicate confidence. MacBridge is credible because the environment is prepared
+            around the real build path Flutter developers actually use.
+          </p>
+          <div class="tool-cluster">
+            <div class="tool-card">
+              <strong>Xcode and iOS runtime</strong>
+              <span>Build and simulator path</span>
+            </div>
+            <div class="tool-card">
+              <strong>Flutter toolchain</strong>
+              <span>Cross-platform app workflow</span>
+            </div>
+            <div class="tool-card">
+              <strong>CocoaPods and package plumbing</strong>
+              <span>Dependency resolution</span>
+            </div>
+            <div class="tool-card">
+              <strong>Remote access surface</strong>
+              <span>SSH and GUI entry points</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="proof-list panel">
+          <span class="mini-title">Agent Support</span>
+          <h3>Bring the way you already work</h3>
+          <div class="agent-grid">
+            <div class="agent-card">
+              <strong>Claude Code</strong>
+              <p>For deeper code reasoning, longer implementation loops, and architecture-heavy sessions.</p>
+            </div>
+            <div class="agent-card">
+              <strong>OpenCode</strong>
+              <p>For command-line centered execution, orchestration, and rapid iteration inside the environment.</p>
+            </div>
+            <div class="agent-card">
+              <strong>Codex</strong>
+              <p>For fast implementation passes, refinement work, and development loops that stay close to the codebase.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <div class="container pricing-wrap">
+        <div class="pricing-notes">
+          <div class="pricing-note panel">
+            <span class="eyebrow">Commercial Model</span>
+            <h2>Simple enough to buy, serious enough to trust.</h2>
+            <p>
+              The offer should feel premium and controlled, not noisy. The point is to buy back
+              time, avoid machine ownership overhead, and keep the team moving toward release.
+            </p>
+          </div>
+          <div class="pricing-note panel">
+            <span class="mini-title">Best fit</span>
+            <ul class="content-list">
+              <li>Flutter builders working from Windows.</li>
+              <li>Founders or small teams shipping to TestFlight without a dedicated Mac setup.</li>
+              <li>Teams using AI coding agents but needing a practical iOS build surface.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="pricing-card panel">
+          <span class="eyebrow">Launch Offer</span>
+          <h3>MacBridge Access</h3>
+          <div class="price">
+            <strong>$19</strong>
+            <span>per month</span>
+          </div>
+          <p>One clear entry point for builders who need the iOS path without owning the hardware burden.</p>
+          <ul class="pricing-points">
+            <li>Prepared cloud macOS environment for iOS build work.</li>
+            <li>Ready access for Flutter-to-TestFlight workflows.</li>
+            <li>Support for SSH, GUI access, and agent-assisted development.</li>
+            <li>Positioned to reduce setup drag instead of adding another tool to maintain.</li>
+          </ul>
+          <a class="button button-primary" href="#cta">Request beta access</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="cta">
+      <div class="container">
+        <div class="final-card panel">
+          <div>
+            <span class="eyebrow">MacBridge Beta</span>
+            <h2>Stop treating macOS setup as part of product development.</h2>
+            <p>
+              MacBridge is for teams that want iOS output without converting hardware,
+              provisioning, and toolchain drift into recurring work. Use the environment,
+              ship the build, and keep the focus on the app.
+            </p>
+          </div>
+          <div class="final-actions">
+            <a class="button button-primary" href="#">Join beta</a>
+            <a class="button button-secondary" href="#tooling">Inspect environment</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-row">
+      <p><strong>MacBridge</strong> by <strong>Maverix Labs</strong></p>
+      <span>Cloud macOS workflow for shipping iOS without owning the machine layer.</span>
     </div>
-  </div>
-</section>
-
-<!-- ── CTA ──────────────────────────────────────────────────────────────── -->
-<section id="cta" class="cta-section">
-  <div class="container">
-    <h2>Stop renting Macs. Start shipping apps.</h2>
-    <p class="body-lg">The Mac is commodity hardware. The provisioning knowledge is the product. Get a Flutter-ready iOS build environment in 60 seconds.</p>
-    <a href="#" class="cta" style="font-size: 1.05rem; padding: var(--space-4) var(--space-8);">Join the MacBridge beta <span class="cta-arrow">→</span></a>
-    <div class="signal-rail">
-      <span class="signal-pill"><span class="dot"></span> Phase 0 validated</span>
-      <span class="signal-pill"><span class="dot"></span> tmux session persistence</span>
-      <span class="signal-pill"><span class="dot"></span> Cross-device workflow</span>
-    </div>
-  </div>
-</section>
-
-<!-- ── Footer ───────────────────────────────────────────────────────────── -->
-<footer>
-  <div class="container">
-    <span class="body-sm">© 2026 <span style="color: var(--accent-primary);">Maverix Labs</span></span>
-    <span class="mono" style="font-size: 0.75rem;">Built on 10 Phase 0 lessons. 1,040-line terminal log. 813-line provisioning journal.</span>
-  </div>
-</footer>
-
+  </footer>
+</div>
 </body>
 </html>
