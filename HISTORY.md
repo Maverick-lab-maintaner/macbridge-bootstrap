@@ -2206,4 +2206,70 @@ Before: MacBridge was a hosting business with a dead margin model and a site tha
 
 ---
 
+## Act XVIII: First Contact With Real macOS — Three Product Bugs and the First 🟢 MAC READY
+
+**Context:** Act XVII built the free Apple-hardware test bed (`macos-smoke.yml`) but had not yet pulled the trigger. This act ran it — the first time any of this code executed on real macOS — and the results were humbling and exactly why the test bed exists: **the core product script could not run on its own target OS, the verifier reported a false failure, and the final readiness gate was impossible to pass anywhere.** Three real bugs, all invisible from Windows, all fixed in one afternoon for $0.
+
+### Run 1: the tooling suite works — and correctly says "blocked"
+
+The first dispatch ran the read-only suite (`verify`/`doctor`/`signing-doctor`/`readiness`/`golden-image manifest`) on a `macos-latest` runner (macOS 26.4, Xcode 26.5, arm64) in 39 seconds. Every tool executed and emitted a valid status contract, and the *content* was right too: a bare CI runner has no Flutter, no signing identity, no agents — the suite diagnosed it as `blocked` with 10 doctor issues. A correct "not ready" on a machine that isn't ready is a pass for a verification product.
+
+### Bug 1: `declare -A` — the bootstrap could not run on a Mac at all
+
+The second dispatch opted into the bootstrap path (`brew install --cask flutter`, then `bootstrap.sh --from 2 --tier vanilla`). The log's third line:
+
+```
+bootstrap.sh: line 121: declare: -A: invalid option
+```
+
+**macOS ships bash 3.2** (Apple froze it pre-GPLv3), and `declare -A` (associative arrays) is bash 4+. The orchestrator crashed before running a single layer — on the operating system the entire product targets. The bitter irony: Act XIV's SH1 cleanup had *already* encoded this exact rule for `migrate.sh`'s `mapfile` suggestion ("mapfile is bash 4+, macOS is bash 3.2") while `declare -A` sat two files away, unflagged, because ShellCheck doesn't flag bash-4isms by default. The fix was a drop-in — `LAYER_STATUS` is keyed by layer numbers 0–4, so a plain indexed array suffices; `migrate.sh`'s string-keyed `GOLDEN_IMAGES` became parallel indexed arrays + a `golden_desc()` lookup, which also deleted the perl sort and its `SC2207` suppression (declaration order *is* release order).
+
+### Bug 2: the verifier lied — `xcodebuild "NOT FOUND"` on a Mac where it worked
+
+Same run, stranger symptom: `verify.sh` reported `FAIL xcodebuild NOT FOUND` while the workflow's own "Environment info" step printed `Xcode 26.5` from the same binary seconds earlier. The cause is a classic `pipefail` trap: check commands like `xcodebuild -version | head -1` let `head` close the pipe after one line; the tool dies with **SIGPIPE (exit 141)**; under `set -o pipefail` the pipeline reports failure; `record_check` records a false FAIL. Ten check commands had the pattern. The fix: remove ` | head -1` from every check — `record_check` already truncates to the first line *after* capturing. A verification product whose verifier produces false negatives is broken in the worst way: it erodes the exact trust it sells.
+
+### Bug 3: the readiness gate was impossible to pass — hidden behind silenced evidence
+
+With bootstrap now running, Layer 2 passed in 25s… and Layer 4 failed in 0 seconds with only *"Flutter SDK may be broken."* The actual error had been sent to `/dev/null` by `flutter create ... > /dev/null 2>&1`. First fix: capture the output and print the last 20 lines on failure (Lesson 8 — never discard the failure evidence). The re-run then revealed the real bug instantly:
+
+```
+"macbridge-smoke-test-7762" is not a valid Dart package name. Try "macbridge_smoke_test_7762" instead.
+```
+
+`TEST_DIR="/tmp/macbridge-smoke-test-$$"` — **hyphens are invalid in Dart package names**, and `flutter create` derives the package name from the directory. Layer 4, the final gate that stamps a Mac "READY", could never have passed on any machine, ever. It was a two-bug chain: the silenced stderr hid the impossible gate behind a misleading message. Renamed to `/tmp/macbridge_smoke_test_$$` (with `cleanup.sh` wiping both patterns).
+
+### Run 4: 🟢 MAC READY
+
+With all three fixes on the branch, the fourth dispatch ran the full path on real Apple hardware:
+
+```
+✅ Flutter project created: /tmp/macbridge_smoke_test_9026
+✅ iOS build succeeded — Flutter → iOS pipeline verified
+✅ Layer 4 passed (39s)
+║  🟢 MAC READY — vanilla tier  ║
+```
+
+**The first MAC READY in the project's history** — `bootstrap --from 2` → verify → an actual `flutter build ios --debug --no-codesign` producing an artifact, end-to-end on a real Mac, at a cost of zero dollars. The product's core claim is no longer an untested assertion.
+
+(One footnote for future readers of run logs: a `gh run watch` reported exit 1 on a run that had actually succeeded — a transient auth artifact after a mid-session re-login. `gh run view --json jobs` showed every step `success`. Verify the run, not the watcher.)
+
+### Exact toolchain used in this pass
+
+- `gh workflow run macos-smoke.yml [-f run_bootstrap=true] --ref <branch>` — four dispatches, each 39s–3m10s on `macos-latest`
+- `gh run watch --exit-status` + `gh run view --log` piped through `sed -E 's/^[^\t]*\t[^\t]*\t[0-9TZ:.-]+ //'` and `sed 's/\x1b\[[0-9;]*m//g'` to strip log prefixes and ANSI before grepping
+- `grep -rn "declare -A"` plus a bash-4ism sweep (`readarray|mapfile|${var^^}|&>>`) to find every instance, not just the one that crashed
+- `bash -n`, `bash migrate.sh --list/--check` locally to prove the parallel-array rewrite before pushing
+- fixes verified by re-dispatching the same workflow — the failing run became the regression test
+
+### What this changed
+
+Before: the tooling was "validated locally, never run on a real Mac" — and that caveat was hiding a crash, a false negative, and an impossible gate. After: the full provisioning pipeline is proven on real Apple hardware, the smoke workflow is a repeatable $0 regression suite, and the "never run on a Mac" caveat is retired for everything except the GUI/login pieces (`workspace-setup` login behaviour, `provision.ps1` against a live host).
+
+### The operational lesson
+
+> "Runs on my machine" is not a subset of "runs on the target" — they can be disjoint.
+> One free CI run on the real OS found a crash, a false verifier verdict, and an unpassable gate that all the Windows-side validation could not see. And the bugs chained: silenced error output concealed an invalid-name bug behind a misleading message. The test bed that cost nothing found the bugs that would have cost the first customer demo.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*

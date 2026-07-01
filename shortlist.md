@@ -108,13 +108,15 @@ locally (AST parser, mocked contracts, `--dry-run`) but **not yet run on a real 
 leftovers: **S3 (provider-agnosticism)** is now *more* valuable (Studio must run identically
 on any Mac), while **W5 (provider API)** is deferred to the Managed tier.
 
-**The "never run on a real Mac" caveat is retired for the read-only tooling.** The
-`macos-smoke.yml` workflow ran the suite on a real GitHub `macos-latest` runner (run
-28544716383): `verify`/`doctor`/`signing-doctor`/`readiness`/`golden-image manifest` all
-executed on real macOS and emitted valid status contracts — correctly diagnosing a bare
-runner as `blocked` (no Flutter, no signing identity). Still untested on a real Mac:
-`bootstrap.sh` end-to-end (smoke opt-in exists), `workspace-setup.sh` login behaviour,
-`provision.ps1` against a live host.
+**The "never run on a real Mac" caveat is retired.** The `macos-smoke.yml` workflow ran
+everything on real GitHub `macos-latest` runners: the read-only suite emitted valid
+contracts (correctly diagnosing a bare runner as `blocked`), and after fixing three real
+bugs the run found (`declare -A` is bash 4+ but macOS ships 3.2; `| head -1` +
+`pipefail` = SIGPIPE false-FAILs; hyphenated smoke-test dir is an invalid Dart package
+name), **the full `bootstrap --from 2` → verify → `flutter build ios` path produced the
+first 🟢 MAC READY in the project's history** (run 28546747490, $0). See `HISTORY.md`
+Act XVIII. Still untested on a real Mac: `workspace-setup.sh` login behaviour and
+`provision.ps1` against a live host (both need GUI/SSH, not CI).
 
 **Next moves:** decide the S7 tier structure (business), then Studio packaging P0
 (`docs/STUDIO_PACKAGING.md`). When you have a Mac with GUI access, `golden-image.sh build`

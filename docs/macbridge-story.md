@@ -209,6 +209,30 @@ The product definition matured with it:
 > the product is not the Mac
 > the product is the continuously verified development workspace
 
+### 11. First contact with real macOS found three real bugs — then the first MAC READY
+
+The free GitHub macOS runner finally ran the tooling on its actual target OS.
+Four dispatches, three product bugs, zero dollars:
+
+- `declare -A` crashed `bootstrap.sh` instantly — macOS ships bash 3.2, and
+  associative arrays are bash 4+. The core product script had never been able
+  to run on a Mac.
+- `verify.sh` reported `xcodebuild NOT FOUND` on a Mac where it worked —
+  `tool | head -1` under `pipefail` turns SIGPIPE into a false FAIL. A verifier
+  that produces false negatives erodes the exact trust the product sells.
+- Layer 4, the final readiness gate, was impossible to pass anywhere:
+  `flutter create` rejects hyphenated directory names as Dart package names,
+  and the error had been silenced into `/dev/null` behind a vague message.
+
+With all three fixed, the fourth run produced the first 🟢 MAC READY in the
+project's history — bootstrap, verify, and a real `flutter build ios` on real
+Apple hardware.
+
+The lesson is the sharpest one yet:
+
+> "runs on my machine" and "runs on the target" can be disjoint —
+> and the silenced error is the one that hides the impossible gate
+
 ## What Broke, and What It Taught
 
 ### Shell is good at orchestration
