@@ -813,6 +813,23 @@
     line-height: 1.6;
   }
 
+  .pricing-card.soon {
+    opacity: 0.82;
+  }
+
+  .soon-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
   .final-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
