@@ -236,17 +236,56 @@ func renderTUI(report statusReport, host string) {
 	fmt.Println()
 }
 
+var (
+	doctorSigning bool
+	doctorProject string
+	doctorJSON    bool
+)
+
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
-	Short: "Run remote remediation guidance",
+	Short: "Run remote remediation guidance (environment, or --signing for code signing)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := hostRequired(); err != nil {
 			return err
 		}
 		return runSSHCommand(
-			"cd ~/macbridge-bootstrap && bash doctor.sh --quick",
+			buildDoctorCommand(),
 			false,
 			"-o", "ConnectTimeout=10",
 		)
 	},
+}
+
+func init() {
+	doctorCmd.Flags().BoolVar(&doctorSigning, "signing", false, "Diagnose iOS code-signing readiness instead of the environment")
+	doctorCmd.Flags().StringVar(&doctorProject, "project", "", "Project path on the Mac to inspect (with --signing)")
+	doctorCmd.Flags().BoolVar(&doctorJSON, "json", false, "Emit machine-readable status-contract JSON")
+}
+
+// buildDoctorCommand assembles the remote command for `macbridge doctor`.
+// Default is the environment doctor; --signing switches to the read-only
+// code-signing diagnoser.
+func buildDoctorCommand() string {
+	if doctorSigning {
+		remote := "cd ~/macbridge-bootstrap && bash signing-doctor.sh"
+		if doctorProject != "" {
+			remote += " --project " + shellQuote(doctorProject)
+		}
+		if doctorJSON {
+			remote += " --json"
+		}
+		return remote
+	}
+
+	remote := "cd ~/macbridge-bootstrap && bash doctor.sh --quick"
+	if doctorJSON {
+		remote += " --json"
+	}
+	return remote
+}
+
+// shellQuote wraps a value in single quotes for safe use in a remote command.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

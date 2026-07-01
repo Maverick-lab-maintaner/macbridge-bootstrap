@@ -1,0 +1,6 @@
+# MacBridge Radar dependencies
+# Runtime: HTTP client for RSS/search source adapters (http2 extra for HTTPTransport http2=True)
+httpx[http2]>=0.28
+
+# Dev/test
+pytest>=8.0

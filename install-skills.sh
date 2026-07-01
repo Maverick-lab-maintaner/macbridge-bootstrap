@@ -245,7 +245,11 @@ echo -e "  ${CYAN}Already present:${NC} $SKIPPED"
 echo -e "  ${YELLOW}Not found in source:${NC} $MISSING"
 echo ""
 
-TOTAL_SKILLS=$(( ${#ALL_SKILLS[@]} + ( [ "$TIER" = "agent" ] && echo "${#AGENT_SKILLS[@]}" || echo 0 ) ))
+AGENT_SKILL_COUNT=0
+if [ "$TIER" = "agent" ]; then
+    AGENT_SKILL_COUNT=${#AGENT_SKILLS[@]}
+fi
+TOTAL_SKILLS=$(( ${#ALL_SKILLS[@]} + AGENT_SKILL_COUNT ))
 echo -e "  ${BOLD}Agent skills available: ${GREEN}$((INSTALLED + SKIPPED))/$TOTAL_SKILLS${NC}"
 echo ""
 

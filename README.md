@@ -253,6 +253,26 @@ bash cleanup.sh --force      # Skip confirmation
 bash cleanup.sh --dry-run    # Preview without changes
 ```
 
+## Signing Diagnosis (signing-doctor.sh)
+
+Read-only diagnosis of iOS code-signing readiness. It inspects signing identities and provisioning profiles, and — given a project — its bundle identifier and development team, then explains what to fix. It **never** creates certificates or provisioning profiles, never touches your Apple Developer account, and never stores credentials.
+
+```bash
+bash signing-doctor.sh                  # identities + profiles
+bash signing-doctor.sh --project .      # also read a project's bundle id / team
+bash signing-doctor.sh --json           # machine-readable status contract
+```
+
+Detects: no signing identity, expired/invalid certificates, no provisioning profiles, unset development team, and a project team with no matching identity in the keychain. Emits the same status-contract JSON as `verify.sh`/`doctor.sh`.
+
+From the Go CLI it runs remotely over SSH via the `doctor` command:
+
+```bash
+macbridge doctor --host <ip> --signing                       # signing diagnosis
+macbridge doctor --host <ip> --signing --project ~/myapp      # inspect a project
+macbridge doctor --host <ip> --signing --json                # machine-readable
+```
+
 ## Prerequisites
 
 - macOS 14+ (Sonoma or later)
@@ -268,6 +288,7 @@ bash cleanup.sh --dry-run    # Preview without changes
 - [PHASE0_FIRST_IOS_BUILD.md](../Obsidian/KnowledgeBase/MacBridge/PHASE0_FIRST_IOS_BUILD.md) — First iOS build milestone
 - [POST_PHASE0_SYNTHESIS.md](../Obsidian/KnowledgeBase/MacBridge/POST_PHASE0_SYNTHESIS.md) — Strategy shift post-provisioning
 
+- [docs/macbridge-story.md](docs/macbridge-story.md) - Learning-oriented chronology of the repo, failures, and fixes
 ---
 
 **Maverix Labs** | Phase 0-validated | June 2026

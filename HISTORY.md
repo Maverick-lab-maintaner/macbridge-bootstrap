@@ -1101,4 +1101,777 @@ After this pass:
 
 ---
 
+## Act VIII: Windows Bring-Up, LSP Recovery, and the Difference Between Architecture and Runtime
+
+**Context:** After the architectural work was documented in `c10834a` and the repo looked structurally stronger on paper, a more practical question followed:
+
+> Is the Windows side actually ready before testing on a real Mac?
+
+That question forced a second kind of validation. The problem was no longer "is the design coherent?" It was:
+
+1. does the Windows operator surface really execute,
+2. do the local toolchains actually resolve under Codex/OpenCode,
+3. does the repo behave the same way under shell, Go, PowerShell, and LSP scrutiny,
+4. and do the docs claim more than the implementation currently proves?
+
+This pass exposed one of the most important lessons in the whole project:
+
+> A repo can have the right architecture and still fail at the last inch because of transport, path, quoting, or shell-runtime details.
+
+### The First Failure: LSP Was "Configured" but Not Actually Usable
+
+The first runtime failure was not in repo code. It was in the Codex-side MCP configuration.
+
+Codex would not start:
+
+```text
+Error loading config.toml: invalid transport
+in `mcp_servers.lsp`
+```
+
+**The cause:** a top-level `[mcp_servers.lsp]` block had been added with only:
+
+```toml
+[mcp_servers.lsp]
+startup_timeout_sec = 120
+```
+
+That looked harmless, but an MCP server definition without a `command` or `url` is invalid. The whole Codex config failed to load.
+
+**The fix happened in two stages:**
+
+1. first, complete the block into a valid server definition so Codex could boot again;
+2. then remove the brittle version-pinned plugin path and replace it with a stable wrapper command.
+
+The durable fix was:
+
+```toml
+[mcp_servers.lsp]
+command = "C:\\Users\\MAVERIX\\.codex\\bin\\codex-lsp-latest.cmd"
+startup_timeout_sec = 120
+```
+
+That wrapper script dynamically resolved the newest installed OMO plugin version instead of hardcoding `4.13.0`.
+
+**What this taught:** a timeout override is not free-standing configuration. If you surface a top-level MCP server, you own the full transport definition.
+
+### The Second Failure: `gopls` Was Installed But Still "Missing"
+
+After the transport was fixed, `mcp__lsp.status` came back, but reported:
+
+```text
+- gopls: missing
+```
+
+even though `gopls.exe` was present and runnable.
+
+**The actual state on disk:**
+- `C:\Program Files\Go\bin\go.exe` existed
+- `C:\Users\MAVERIX\tools\go\bin\go.exe` existed
+- `C:\Users\MAVERIX\go\bin\gopls.exe` existed
+- `gopls version` returned `golang.org/x/tools/gopls v0.22.0`
+
+**The problem was not installation.** It was discovery by the already-running LSP daemon.
+
+The daemon had started with an older process `PATH`, so the shell and the MCP did not agree about what "installed" meant.
+
+**The fix:** add a user-level LSP client override:
+
+```json
+{
+  "lsp": {
+    "gopls": {
+      "command": [
+        "C:\\Users\\MAVERIX\\go\\bin\\gopls.exe"
+      ],
+      "extensions": [
+        ".go"
+      ]
+    }
+  }
+}
+```
+
+in:
+
+```text
+C:\Users\MAVERIX\.codex\lsp-client.json
+```
+
+After that, `mcp__lsp.status` reported:
+
+```text
+- gopls: installed; source=user; extensions=.go
+```
+
+and later showed an active `gopls` client.
+
+**What this taught:** installation state and daemon-resolution state are separate systems. When an agent says "installed," that is not proof the live daemon can execute the binary.
+
+### The Third Failure: LSP Warnings Looked Like Go Errors But Weren't
+
+Once `gopls` was active, diagnostics on files like:
+
+- `cmd/macbridge/commands/provision.go`
+- `internal/providers/providers.go`
+
+showed:
+
+```text
+warning[go list] at 1:8: No active builds contain ...
+```
+
+That warning first looked like a repo-level breakage. It was not.
+
+Direct toolchain verification from the module root showed:
+
+```powershell
+C:\Program Files\Go\bin\go.exe list ./...
+C:\Program Files\Go\bin\go.exe test ./...
+```
+
+Both passed.
+
+**Conclusion:** the repo was valid; the warning was a `gopls` workspace-root integration quirk in this environment, not a broken module.
+
+This distinction mattered because it prevented a fake fix. The right response was to record the warning as non-blocking, not to change valid Go code to satisfy a transport artifact.
+
+### The Fourth Failure: The Real Windows Blocker Was `provision.ps1`
+
+The architectural audit of the Windows side surfaced the real operator-facing failure:
+
+```text
+provision.ps1 does not parse as valid PowerShell
+```
+
+The initial parser errors pointed at:
+
+```powershell
+& ssh -t @sshOpts "$User@$MacHost" "cd $RemoteDir && bash welcome.sh"
+```
+
+This looked like one bug. It was actually several overlapping bugs.
+
+#### Failure mode 1: Invalid splatting form
+
+PowerShell did not accept:
+
+```powershell
+& ssh -t @sshOpts ...
+```
+
+The `-t` flag and the splatted array had to be composed into one argument array.
+
+#### Failure mode 2: Interpolation ambiguity
+
+Strings like:
+
+```powershell
+"$User@$MacHost"
+```
+
+caused parse trouble under this host. They had to be normalized to explicit formatting or array-built arguments.
+
+#### Failure mode 3: Literal `&&` in command strings
+
+This was the least obvious one. Even apparently quoted strings containing:
+
+```text
+&&
+```
+
+were rejected by the local PowerShell parser in the way the script had been written. This affected lines such as:
+
+```powershell
+"cd $RemoteDir && bash welcome.sh"
+```
+
+and even user-facing summary strings showing example commands.
+
+#### Failure mode 4: mojibake/encoding contamination
+
+The file contained mixed Unicode/mojibake output from prior editing:
+- smart punctuation
+- box-drawing glyphs
+- arrows
+- emoji-like banner characters
+
+That made line-by-line repair harder because parse errors did not always point at the true semantic issue.
+
+### The Real Fix: Rewrite the Windows Bridge Cleanly
+
+After several targeted repairs exposed new parser issues, the correct move was not another micro-patch. It was a clean rewrite of `provision.ps1` into a plain ASCII PowerShell script with:
+
+- consistent `admin` default user
+- argument-array based `ssh` and `scp` helpers
+- explicit runtime failure paths
+- session persistence to `~/.macbridge/session.json`
+- optional `-Welcome`, `-Hardening`, and `-ReportTo`
+- remote commands using `;` instead of `&&`
+
+The final structure used helper functions:
+
+```powershell
+function Run-Ssh { ... }
+function Run-Scp { ... }
+function Fail-Step { ... }
+```
+
+and built all remote commands through those helpers instead of inline ad hoc invocations.
+
+**Verification surface changed too:**
+- before: the script failed at parse time
+- after: it parsed cleanly and reached runtime validation, failing correctly on a fake key with:
+
+```text
+SSH key not found: C:\definitely-missing-key
+```
+
+That is a much more meaningful failure. It proves the script is executable and now fails only on real operator input.
+
+### The Fifth Failure: Windows and Go Were Drifting Apart
+
+The repo now had two provisioning surfaces:
+
+1. `provision.ps1`
+2. `macbridge provision`
+
+Those surfaces were not aligned.
+
+#### Drift 1: default SSH user
+
+PowerShell used the local Windows username by default.
+
+The Go CLI used:
+
+```go
+RootCmd.PersistentFlags().StringVar(&macUser, "user", "admin", ...)
+```
+
+That mismatch meant the same operator could be told two different defaults depending on entrypoint.
+
+**Fix:** standardize the PowerShell script on `admin`.
+
+#### Drift 2: `--report-to` was exposed but not propagated
+
+The Go CLI had:
+
+```go
+RootCmd.PersistentFlags().StringVar(&reportTo, "report-to", "", ...)
+```
+
+but the manual provider plan ignored it.
+
+That meant the CLI advertised centralized reporting while only the PowerShell path actually supported it.
+
+**Fix:** extend `ProvisionRequest` with:
+
+```go
+ReportTo string
+```
+
+and thread it into the provider plan so the remote bootstrap command became:
+
+```text
+ssh ... 'cd ~/macbridge-bootstrap; bash bootstrap.sh --tier agent --report-to "https://..."'
+```
+
+instead of appending `--report-to` outside the remote quoted command, which would have been semantically wrong.
+
+### The Sixth Failure: "Docs Done" and "Runtime Done" Were Not the Same Milestone
+
+At this point the repo had two adjacent commits with very different meanings:
+
+| Commit | Meaning |
+|------|------|
+| `c10834a` | The control-plane architecture is documented and explained |
+| `022d75f` | The implementation, Windows bridge, provider seam, and public/docs surfaces are actually wired together |
+
+This distinction matters.
+
+The earlier commit was not "wrong." It accurately described the architecture. But it was ahead of the runtime proof for one critical surface: Windows provisioning.
+
+The next commit was the one that made the docs true in practice.
+
+### Exact Toolchain Used In This Pass
+
+This pass was instructive because it was not solved by one language or one tool. It required cross-checking the same behavior through multiple surfaces.
+
+#### Shell and script verification
+
+- `bash -n bootstrap.sh verify.sh doctor.sh migrate.sh healthd.sh hardening.sh welcome.sh cleanup.sh lib/*.sh`
+- `verify.sh --json --quick`
+- `doctor.sh`
+
+#### Go verification
+
+- `C:\Program Files\Go\bin\go.exe version`
+- `C:\Program Files\Go\bin\go.exe list ./...`
+- `C:\Program Files\Go\bin\go.exe test ./...`
+- `gofmt.exe -w ...`
+
+#### PowerShell verification
+
+- PowerShell parser checks through `System.Management.Automation.Language.Parser`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File provision.ps1 ...`
+
+#### LSP and editor-surface verification
+
+- `mcp__lsp.status`
+- `mcp__lsp.diagnostics`
+- `typescript-language-server`
+- `bash-language-server`
+- `@biomejs/biome`
+- `gopls`
+
+#### Git and release verification
+
+- `git status`
+- `git diff --staged --stat`
+- `git show --stat`
+- `git push origin master`
+- GitHub combined status check on the relevant commit
+
+### What This Changed
+
+Before this pass:
+- the repo had a credible architecture but an unreliable Windows operator surface,
+- `gopls` was on disk but not visible to the live LSP daemon,
+- LSP warnings were easy to misread as code failure,
+- and the two provisioning entrypoints were not behaviorally aligned.
+
+After this pass:
+- the Codex LSP transport was valid again,
+- Go LSP resolution was explicit and stable,
+- PowerShell provisioning was parser-safe and runtime-safe,
+- the Go manual-provider path propagated reporting correctly,
+- the Windows default user was consistent,
+- and the difference between architectural truth and runtime truth was recorded explicitly.
+
+### The Operational Lesson
+
+This act sharpened a final lesson that belongs next to the original 10 Phase 0 lessons:
+
+> In infrastructure products, the last 5 percent is usually transport, path, quoting, encoding, and daemon state.  
+> That 5 percent is not polish. It is the product becoming real.
+
+---
+
+## Act IX: MacBridge Radar, PACER Framing, and Turning Outbound Discovery Into an Internal Operator Tool
+
+**Context:** After the Windows control plane was stabilized, the next question was not provisioning. It was growth:
+
+> Can MacBridge detect people who already have the exact pain it solves, and help draft the right reply without becoming a spam bot?
+
+That question produced a new subproject: `ops/radar/`.
+
+The work moved through three distinct phases:
+
+1. a PACER-based strategy note so the idea could be reasoned about clearly,
+2. a Phase 1 listening-only prototype,
+3. a Phase 2/3 review workflow with drafts and a local board.
+
+### PACER Was the Right Lens
+
+The PACER doc became the first learning artifact for this work:
+
+- `LEAD_INTEL_PACER.md`
+
+It explained the idea in beginner language and separated the concept into:
+
+- `C` conceptual: the system listens for real pain signals
+- `P` procedural: collect -> classify -> score -> draft -> approve -> post -> learn
+- `A` analogous: Agent Reach is to web/platform access what Radar is to market listening
+- `E` evidence: Agent Reach proves the access/fallback/doctor pattern works
+- `R` reference: queries, templates, and exact commands belong in the operational layer
+
+That distinction mattered because the system would otherwise collapse into one of two bad extremes:
+
+- theory without an implementation path
+- implementation without a clear operating model
+
+PACER kept the work honest.
+
+### Replymer Was Useful, But Not the Same Thing
+
+The comparison target was `Replymer`.
+
+What Replymer appears to do:
+
+- monitor public conversations
+- identify relevant posts
+- draft replies
+- in some cases offer managed posting or review workflows
+
+What MacBridge Radar became:
+
+- an internal founder tool
+- a listening and triage system
+- a reply-drafting system
+- a review queue with explicit approval state
+- a local board for human review
+
+The difference is not cosmetic.
+
+Replymer is closer to an outward-facing engagement service.
+MacBridge Radar is a founder-controlled operator tool.
+
+That choice was deliberate because the user-facing risk is real:
+
+- blind auto-replies get ignored
+- mass outreach gets flagged
+- platform trust gets damaged quickly
+
+So the implementation stayed on the safe side:
+
+- listen automatically
+- classify automatically
+- draft automatically
+- approve manually
+- export only approved items
+
+### Phase 1: Listening-Only Prototype
+
+The first version lived under:
+
+- `ops/radar/`
+
+The inputs were intentionally simple:
+
+- manual JSON lead files
+- optional RSS/Atom feed URLs
+
+The first pass used:
+
+- `queries.json` for pain and intent buckets
+- `sample/manual_leads.json` for local test leads
+- `feeds.txt` for optional feed sources
+- `schema/lead-item.schema.json` for the lead shape
+
+The core scan command was:
+
+```powershell
+python ops/radar/radar.py scan --manual ops/radar/sample/manual_leads.json --out ops/radar/output
+```
+
+It generated:
+
+- `radar-report.json`
+- `radar-brief.md`
+- `review-queue.json`
+
+That first run proved the heuristic ranking behavior:
+
+- the strongest X/Reddit pain posts scored highest
+- the generic GitHub question scored low and became `no_reply`
+
+That was the correct outcome.
+
+### Phase 2: Review Queue and Draft Assist
+
+The next step added explicit queue management:
+
+- `review --list`
+- `review --approve <id>`
+- `review --reject <id>`
+- `review --export-approved <file>`
+
+This is where the system stopped being just a detector and became an operator aid.
+
+The reviewed queue became the durable state:
+
+- `pending_review`
+- `approved`
+- `rejected`
+- `posted`
+
+The first version also attached reply drafts per lead:
+
+- `help_only`
+- `help_plus_soft_mention`
+
+This is important because the system is not about auto-selling.
+It is about having the right answer ready when there is real intent.
+
+### Phase 3: Review Board and Local Human Surface
+
+The review queue was still too raw to use comfortably, so a local HTML board was added:
+
+- `board --queue ... --out ops/radar/output/radar-board.html`
+
+That board showed:
+
+- score
+- recommendation
+- source platform
+- author
+- query matches
+- review status
+- both reply drafts
+
+The board is read-only by design.
+Review decisions stay explicit through the CLI.
+
+### The Refactor Was Forced by the File-Size Discipline
+
+The first Radar implementation was too large for the file-size rule.
+
+That triggered the same lesson the shell control plane already taught:
+
+> if the code is trying to do too much in one place, split it before adding more complexity
+
+Radar was refactored into:
+
+- `models.py`
+- `sources.py`
+- `engine.py`
+- `review.py`
+- `board.py`
+- `radar.py`
+
+That split made the system easier to test and reason about:
+
+- `models.py` owns typed values and queue serialization
+- `sources.py` owns manual-file and RSS ingestion
+- `engine.py` owns scoring and draft generation
+- `review.py` owns queue state transitions
+- `board.py` owns the HTML review surface
+- `radar.py` owns CLI dispatch
+
+The split was not optional. It was the only way to keep the module honest.
+
+### Exact Toolchain Used In This Pass
+
+This pass used a different toolchain than the shell stack:
+
+#### Python verification
+
+- `python ops/radar/radar.py scan --manual ops/radar/sample/manual_leads.json --out ops/radar/output`
+- `python ops/radar/radar.py review --queue ops/radar/output/review-queue.json --list`
+- `python ops/radar/radar.py review --queue ops/radar/output/review-queue.json --approve ...`
+- `python ops/radar/radar.py review --queue ops/radar/output/review-queue.json --reject ...`
+- `python ops/radar/radar.py review --queue ops/radar/output/review-queue.json --export-approved ...`
+- `python ops/radar/radar.py board --queue ops/radar/output/review-queue.json --out ops/radar/output/radar-board.html`
+- `python -m py_compile ops/radar/models.py ops/radar/sources.py ops/radar/engine.py ops/radar/review.py ops/radar/board.py ops/radar/radar.py`
+
+#### Docs verification
+
+- `LEAD_INTEL_PACER.md` for the PACER framing
+- `ops/radar/README.md` for the workflow
+
+#### Content verification
+
+- sample leads from `ops/radar/sample/manual_leads.json`
+- heuristics from `ops/radar/queries.json`
+- queue export from `ops/radar/output/approved-leads.json`
+- HTML board from `ops/radar/output/radar-board.html`
+
+### What This Changed
+
+Before this pass:
+
+- MacBridge had an operating control plane for provisioning
+- there was no internal lead-intel workflow
+- response drafting would have been ad hoc and manual
+
+After this pass:
+
+- Radar exists as a separate ops module
+- discovery is separated from posting
+- reply drafting is separated from approval
+- the founder can inspect, triage, and export leads without turning the system into a bot
+
+### The Operational Lesson
+
+This act adds a new product lesson:
+
+> The same discipline that keeps provisioning safe also keeps outbound growth safe.  
+> Separate listening from posting, drafts from approvals, and evidence from assumptions.
+
+---
+
+## Act X: First Live Source Connector, Reddit Search RSS, and Why the Live Edge Still Needs Guardrails
+
+**Context:** Radar had a clean local pipeline, but it was still only as real as the sample JSON we fed into it. The next step was to connect it to an actual public source and prove that the scan path could bring in fresh items without breaking the review queue or the scoring surface.
+
+### The Connector Chosen
+
+The first live connector is Reddit search RSS. It fits the product better than a blind API scrape because:
+
+- it is publicly reachable
+- it returns Atom/RSS that the existing parser can consume
+- it surfaces the kind of technical pain MacBridge cares about
+- it keeps the system in "listen first" mode instead of posting automatically
+
+The live path is exposed through the Radar CLI as an optional scan flag, so local fixtures and live discovery can run together.
+
+### What Was Implemented
+
+- live search requests are built from the existing query buckets
+- the connector uses `httpx2` with the production client defaults
+- RSS/Atom parsing stays in the source layer, not the CLI
+- live items are deduped before scoring
+- HTTP 429 responses are handled as a soft failure so one bad request does not kill the whole scan
+- the resulting live leads flow into the same `review-queue.json` / `radar-brief.md` surfaces as the manual leads
+
+### What Broke On The Way
+
+The first attempt used the wrong live source and turned into a dead-end:
+
+- the HN API path returned no useful hits for this domain
+- broad query expansion created too many requests and triggered rate limiting
+- the scan aborted when 429s were not handled as a soft failure
+
+The fix was not to pretend those were good results. The fix was to:
+
+- switch to a source that actually returns relevant public discussion
+- collapse query expansion into a smaller live search set
+- treat rate limits as a warning, not a fatal error
+
+### What This Proved
+
+The Radar pipeline is now source-connected:
+
+- it can start from manual leads
+- it can bring in at least one live public lead source
+- it can survive upstream throttling without losing the entire run
+- it can still hand the founder a queue that is reviewable and exportable
+
+The live edge is still best-effort, not magical. That is correct for a first connector.
+
+---
+
+## Act XI: The Audit Pass — CI Coverage, a Supply-Chain Catch, and Two Reversals Against Ground Truth
+
+**Context:** This pass was not a build pass. It was an audit-and-harden pass over the repo as it stood after Act X. The goal was to understand the whole system, find the real gaps, and close the highest-leverage ones. The most important outcomes were not the code that got written — they were two moments where an earlier confident claim was checked against ground truth and had to be reversed. One of those reversals caught a typosquatted dependency that had already been committed into the codebase in Act X.
+
+### The System, Read End to End
+
+The read confirmed the shape the earlier Acts built:
+
+- **Ring 1 — the product:** `bootstrap.sh` orchestrates five isolated layer processes (`bash "$script"` per layer, piped through `tee` to a per-run log). Each layer is `install → PATH-fix → verify → or-exit`. `layer4-project.sh` is the real gate: `flutter create → pub get → pod install → flutter build ios --debug --no-codesign`.
+- **The spine:** `lib/status-contract.sh` is the single JSON emitter (`contract_version: "1"`, states `ready`/`degraded`/`blocked`). `verify.sh` produces it; `doctor.sh`, `healthd.sh`, the Go `status` command, and the Cloudflare receiver all consume that one shape. `verify.sh` is load-bearing for the entire operational story.
+- **Ring 2 — control plane:** the Go CLI is an honest stub. `provision.go` literally prints "Phase 1 API integration is not implemented yet" and emits `scp` + `ssh bash bootstrap.sh` strings instead. The value is `internal/providers/providers.go`: a `Provider` interface with one `ManualProvider`, a seam staked out ahead of real cloud-Mac allocators.
+- **Ring 3 — growth:** `ops/radar/` is the listening-only lead pipeline. `engine.py` scores heuristically and gates the product mention behind score ≥70 on a non-high-risk platform, so the safety policy from `LEAD_INTEL_PACER.md` is enforced in code, not just documented.
+
+### The First Reversal: "The Binary Is Committed" Was Wrong
+
+The initial observation was that `macbridge.exe` (6.5 MB) was committed — a build artifact in source control. That was stated as fact. It was checked before being acted on:
+
+```
+git ls-files --error-unmatch macbridge.exe
+→ error: pathspec 'macbridge.exe' did not match any file(s) known to git
+```
+
+The binary is **gitignored** (`.gitignore` has `/macbridge.exe`), so it never shows in `git status` and is not tracked. The claim was retracted immediately. Lesson: a file's absence from `git status` does not mean it is committed — it can mean it is ignored. Verify tracking with `git ls-files`, not by eyeballing status output.
+
+### The Real Gap: CI Tested None of the New Code
+
+`.github/workflows/ci.yml` ran ShellCheck + `bash -n` syntax + the shell test harness, and its `paths:` trigger only fired on `**.sh` / `**.ps1`. That left **7 tracked Go files and the entire Python radar module with zero CI coverage** — no `go build`, `go vet`, `go test`, no `compileall`, no pytest. There was even an untracked `ops/radar/test_sources.py` that nothing ran.
+
+The rule applied: never wire CI to a code path without first running it locally. Local verification, before touching the workflow:
+
+```
+go build ./...   → ok      (local Go 1.26.4; go.mod declares go 1.22)
+go vet ./...     → ok
+python -m pytest ops/radar/ -q   → 2 passed
+```
+
+### The Second Reversal: `httpx2` Is a Typosquat, Not a Package
+
+This is the important one. `ops/radar/test_sources.py` and `ops/radar/sources.py` both `import httpx2`. First instinct was "typo for `httpx`." That instinct was then talked out of, incorrectly, by trusting `pip` metadata:
+
+```
+python -c "import httpx2; print(httpx2.__file__)"
+→ httpx2 OK  ...\site-packages\httpx2\__init__.py
+
+pip show httpx2
+→ Name: httpx2   Version: 2.5.0
+  Home-page: https://github.com/pydantic/httpx2
+  Summary: The next generation HTTP client.
+  Requires: anyio, httpcore2, idna, truststore
+```
+
+On that basis the package was accepted as "a real pydantic next-gen httpx" and CI was wired to install it. **That was the mistake.** Package metadata is self-reported by the author and is trivially forged. When the user pushed back — "make the correction of httpx2" — the signals were re-read as a set, and they are textbook typosquat:
+
+- the name is a **version-suffixed clone** of a popular package (`httpx` → `httpx2`)
+- the `Summary` is **httpx's own literal tagline**, "The next generation HTTP client"
+- the `Home-page` claims `pydantic/httpx2`, a repo/product that **does not exist** — pydantic does not publish an httpx
+- it depends on **`httpcore2`**, another version-suffixed clone of a real package (`httpcore`)
+- every symbol the code actually used — `Client`, `MockTransport`, `HTTPTransport`, `Timeout`, `Limits`, `HTTPStatusError`, `Request`, `Response` — is the **exact real `httpx` API**, proving the code was written for `httpx` and the `2` was corruption (most likely an agent hallucinating the import name, which `pip` then resolved to a squatter that had registered the name)
+
+The correction, verified against the genuine `httpx` already installed locally (0.28.1):
+
+```
+sed -i 's/httpx2/httpx/g' ops/radar/sources.py ops/radar/test_sources.py
+# requirements.txt: httpx2>=2.5.0  →  httpx[http2]>=0.28
+#   (the [http2] extra is required because create_hackernews_client() uses
+#    HTTPTransport(http2=True))
+rm -rf ops/radar/__pycache__          # drop stale bytecode compiled against the squatter
+python -m compileall -q ops/radar     → ok
+python -m pytest -q                   → 2 passed
+```
+
+The tests passed unchanged on real `httpx` because they only exercise `httpx.MockTransport` — pure API surface, no network — which is exactly why the API-match was such strong evidence.
+
+### What Was Actually Built This Pass
+
+- **CI `go` job:** `actions/setup-go@v5` (go 1.22, `cache-dependency-path: go.sum`) running `go build ./...`, `go vet ./...`, `go test ./...`.
+- **CI `radar` job:** `actions/setup-python@v5` (Python **3.12** — chosen because real `httpx` needs ≥3.8 and the squatter had falsely claimed ≥3.10; 3.12 is safe and cached), `working-directory: ops/radar`, `pip install -r requirements.txt`, `python -m compileall .`, `python -m pytest -q`.
+- **Widened `paths:`** filters to trigger on `**.go`, `**.py`, `go.mod`, `go.sum`, `ops/radar/requirements.txt`.
+- **`ops/radar/requirements.txt`** created, then corrected to `httpx[http2]>=0.28` + `pytest>=8.0`.
+- **`.gitignore` hardened:** added `__pycache__/`, `*.py[cod]`, `.pytest_cache/`, and `ops/radar/output/*` with a `!ops/radar/output/.gitkeep` negation so the directory persists but run artifacts do not.
+- **Committed the previously-untracked work:** the whole `ops/radar/` module, `docs/`, `AGENTS.md`, `LEAD_INTEL_PACER.md` — satisfying the `AGENTS.md` documentation rule that a milestone is not closed until the docs are landed.
+- **Agent-Reach documented as the Phase 4 collection seam** (not built): `github.com/Panniantong/Agent-Reach` is a read/search-only capability layer with ordered backends, automatic fallback, and an `agent-reach doctor` command — the same probe-and-degrade philosophy MacBridge already uses. It maps onto `sources.py` as the collection backend; the note records the adapter shape, a `--agent-reach` gating flag, fail-safe wrapping, and the preserved no-post safety boundary. Chosen: document the seam first, because Agent-Reach is not confirmed installed on target machines.
+
+### Process Notes That Bit
+
+- **Default-branch guardrail:** the repo was on `master` with a live `origin`. Work went onto `feat/ci-go-python-and-radar`, not straight to `master`.
+- **Line endings:** every `git add` emitted `LF will be replaced by CRLF` warnings — the repo normalizes on a Windows checkout; harmless, git stores LF.
+- **Shell cwd drift:** the Bash tool's working directory silently persisted into `ops/radar` after an earlier `cd`, so a later `git add ops/radar/sources.py` failed with `ops/radar/ops/radar/`. Fixed by driving git with an explicit repo root: `git -C "$R" add …`. Lesson: when a tool's cwd is stateful and you cannot see it, use `git -C <root>` (or absolute paths) instead of trusting relative paths.
+
+### Exact Toolchain Used In This Pass
+
+#### Investigation and verification
+
+- `git ls-files --error-unmatch macbridge.exe` — proved the binary was ignored, not tracked
+- `git ls-files | grep -E '\.(go|exe)$'` — enumerated tracked Go files
+- `go build ./... && go vet ./... && go test ./...` — Go control plane (go 1.26.4 local / 1.22 module)
+- `python -c "import httpx2; print(httpx2.__file__)"`, `pip show httpx2`, `importlib.metadata` Requires-Python — the metadata that first misled, then indicted
+- `python -m compileall`, `python -m pytest -q` — radar verification on real `httpx` 0.28.1
+- `python -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"` — CI YAML validation
+- `WebFetch` on `Agent-Reach/docs/README_en.md` — understood the Phase 4 backend before documenting it
+
+#### Editing and delivery
+
+- `sed -i 's/httpx2/httpx/g'` for the mechanical import correction
+- `git checkout -b feat/ci-go-python-and-radar`, `git add -A`, `git -C "$R" commit`, `git push -u origin`
+- three commits: `f52378a` (CI + committed module/docs), `a53df7c` (Agent-Reach Phase 4 docs), `49d92ca` (httpx typosquat fix)
+
+### What This Changed
+
+Before this pass:
+
+- CI proved nothing about the Go control plane or the radar module
+- the radar module, its test, and the required docs were uncommitted
+- a typosquatted `httpx2` (and transitively `httpcore2`) sat in the source and in `requirements.txt`, having entered in Act X as "the connector uses `httpx2` with the production client defaults"
+
+After this pass:
+
+- Go and Python both have real CI gates, triggered by the file types that matter
+- the module and docs are committed on a reviewable branch with clean gitignore hygiene
+- the dependency is the genuine `httpx`, and the supply-chain risk is documented with a remediation (`pip uninstall -y httpx2 httpcore2` on any machine that ran the old requirements)
+
+### The Operational Lesson
+
+This act adds two lessons, both about trusting the right source of truth:
+
+> A package's own metadata is not evidence that the package is legitimate.  
+> `pip show` reports what the author typed. Verify a dependency against signals it cannot forge: does the name clone a popular one, does the homepage actually exist, does it pull in similarly-suffixed dependencies, and does the code use an API that belongs to a *different* package. When those line up, the "2" is not a version — it is bait.
+
+> An auditor's job is to verify claims, including their own.  
+> Two confident statements this pass — "the binary is committed" and "httpx2 is a real package" — were both wrong, and both were caught only by checking against ground truth (`git ls-files`, then the metadata signals read as a set). Being willing to reverse a stated conclusion is the job, not a failure of it.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
