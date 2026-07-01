@@ -265,6 +265,14 @@ bash signing-doctor.sh --json           # machine-readable status contract
 
 Detects: no signing identity, expired/invalid certificates, no provisioning profiles, unset development team, and a project team with no matching identity in the keychain. Emits the same status-contract JSON as `verify.sh`/`doctor.sh`.
 
+From the Go CLI it runs remotely over SSH via the `doctor` command:
+
+```bash
+macbridge doctor --host <ip> --signing                       # signing diagnosis
+macbridge doctor --host <ip> --signing --project ~/myapp      # inspect a project
+macbridge doctor --host <ip> --signing --json                # machine-readable
+```
+
 ## Prerequisites
 
 - macOS 14+ (Sonoma or later)
