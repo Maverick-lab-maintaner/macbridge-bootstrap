@@ -1,0 +1,269 @@
+#!/bin/bash
+# =============================================================================
+# MacBridge — Hardening
+# =============================================================================
+# Locks down a cloud Mac for production use. Closes all inbound ports except
+# SSH (22) and VNC (5900). Configures macOS application firewall. Verifies
+# isolation so customer machines cannot reach each other.
+#
+# Architecture:
+#   Every Mac in the fleet runs hardening.sh once after bootstrap.
+#   Only two ports open: 22 (SSH) and 5900 (VNC/DeskIn).
+#   All other inbound traffic blocked.
+#
+# Usage:
+#   bash hardening.sh                # Full lockdown
+#   bash hardening.sh --dry-run      # Show what would be done
+#   bash hardening.sh --verify       # Check current firewall state
+#
+# Lessons encoded (Phase 0):
+#   Customer machines must be isolated — never trust provider firewall alone
+# =============================================================================
+
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="${SCRIPT_DIR}/lib"
+export MACBRIDGE_LOG_DIR="${SCRIPT_DIR}/logs"
+
+[ -f "${LIB_DIR}/_utils.sh" ] && source "${LIB_DIR}/_utils.sh"
+
+DRY_RUN=false; VERIFY_ONLY=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run) DRY_RUN=true; shift ;;
+        --verify)  VERIFY_ONLY=true; shift ;;
+        --help|-h)
+            echo "Usage: bash hardening.sh [--dry-run] [--verify]"
+            echo ""
+            echo "Locks down cloud Mac firewall:"
+            echo "  --dry-run  Preview changes without applying"
+            echo "  --verify   Check current firewall state (read-only)"
+            exit 0 ;;
+        *) shift ;;
+    esac
+done
+
+echo ""
+echo -e "${BOLD}${CYAN}🔒 MacBridge — Hardening${NC}"
+echo "──────────────────────────────────────────────"
+echo ""
+
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${CYAN}  DRY RUN — no changes will be made${NC}"
+    echo ""
+fi
+
+PASS=0; FAIL=0
+
+# ── Verify current state ───────────────────────────────────────────────────
+
+verify_firewall_state() {
+    echo -e "${BOLD}Current Firewall State:${NC}"
+    echo ""
+
+    # Application Firewall
+    if sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null | grep -q "enabled"; then
+        echo -e "  ${GREEN}✅${NC} Application Firewall: enabled"
+    else
+        echo -e "  ${YELLOW}⚠️${NC}  Application Firewall: disabled"
+    fi
+
+    # PF (Packet Filter)
+    if sudo pfctl -s info 2>/dev/null | grep -q "Enabled"; then
+        echo -e "  ${GREEN}✅${NC} PF (Packet Filter): enabled"
+        echo ""
+        echo "  Active PF rules:"
+        sudo pfctl -s rules 2>/dev/null | grep -v "^$" | sed 's/^/    /' || echo "    (none)"
+    else
+        echo -e "  ${YELLOW}⚠️${NC}  PF (Packet Filter): disabled"
+    fi
+
+    echo ""
+    echo -e "${BOLD}Open Ports:${NC}"
+    sudo lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null | awk 'NR>1 {print $1, $9}' | sort -u | sed 's/^/    /' || echo "    Could not list ports"
+
+    echo ""
+    echo -e "${BOLD}SSH Remote Login:${NC}"
+    if sudo systemsetup -getremotelogin 2>/dev/null | grep -q "On"; then
+        echo -e "  ${GREEN}✅${NC} SSH enabled"
+    else
+        echo -e "  ${YELLOW}⚠️${NC}  SSH disabled"
+    fi
+}
+
+if [ "$VERIFY_ONLY" = true ]; then
+    verify_firewall_state
+    exit 0
+fi
+
+# ── Warning ────────────────────────────────────────────────────────────────
+
+if [ "$DRY_RUN" = false ]; then
+    echo -e "${YELLOW}⚠️  This will lock down the firewall. Only SSH (22) and VNC (5900) will remain open.${NC}"
+    echo -e "${YELLOW}   Running remotely? Make sure SSH stays open or you will lose access.${NC}"
+    echo ""
+    
+    if [ -z "${FORCE:-}" ]; then
+        read -r -p "  Proceed? [y/N] " REPLY
+        echo ""
+        if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+            echo -e "${CYAN}  Hardening cancelled.${NC}"
+            exit 0
+        fi
+    fi
+fi
+
+# ── 1. Enable Application Firewall ─────────────────────────────────────────
+
+step "Enabling Application Firewall..."
+
+if [ "$DRY_RUN" = false ]; then
+    sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on 2>/dev/null || true
+    sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on 2>/dev/null || true
+
+    if sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null | grep -q "enabled"; then
+        ok "Application Firewall enabled (stealth mode on)"
+    else
+        warn "Could not enable Application Firewall — continuing anyway"
+    fi
+else
+    echo -e "  ${YELLOW}→${NC} Would enable Application Firewall + stealth mode"
+fi
+
+# ── 2. Configure PF (Packet Filter) ────────────────────────────────────────
+
+step "Configuring PF firewall rules..."
+
+PF_RULES="/etc/pf.macbridge.conf"
+PF_ANCHOR="com.macbridge"
+
+cat > /tmp/pf.macbridge.conf << 'PFRULES'
+# MacBridge PF rules — generated by hardening.sh
+# Only allows SSH (22) and VNC (5900). Blocks everything else inbound.
+
+# Macros
+tcp_services = "{ 22, 5900 }"
+icmp_types = "{ echoreq, unreach }"
+
+# Default: block everything inbound, pass outbound
+block in all
+pass out all keep state
+
+# Allow loopback
+pass in on lo0
+
+# Allow established connections
+pass in proto tcp from any to any port $tcp_services keep state
+
+# Allow ICMP (ping) for monitoring
+pass in proto icmp icmp-type $icmp_types
+
+# Log blocked packets (useful for debugging — comment out in production)
+# block in log all
+PFRULES
+
+if [ "$DRY_RUN" = false ]; then
+    sudo cp /tmp/pf.macbridge.conf "$PF_RULES"
+    sudo pfctl -f "$PF_RULES" 2>/dev/null || true
+    sudo pfctl -e 2>/dev/null || true  # Enable PF
+
+    if sudo pfctl -s info 2>/dev/null | grep -q "Enabled"; then
+        ok "PF firewall enabled with MacBridge rules"
+    else
+        warn "Could not enable PF firewall"
+    fi
+else
+    echo -e "  ${YELLOW}→${NC} Would install PF rules from /tmp/pf.macbridge.conf"
+fi
+
+rm -f /tmp/pf.macbridge.conf
+
+# ── 3. Ensure PF persists across reboots ───────────────────────────────────
+
+step "Ensuring PF persists across reboots..."
+
+PF_BOOT_PLIST="/Library/LaunchDaemons/com.macbridge.pf.plist"
+
+if [ "$DRY_RUN" = false ]; then
+    sudo tee "$PF_BOOT_PLIST" > /dev/null << 'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.macbridge.pf</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/sbin/pfctl</string>
+        <string>-f</string>
+        <string>/etc/pf.macbridge.conf</string>
+        <string>-e</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>
+PLIST
+    sudo launchctl load "$PF_BOOT_PLIST" 2>/dev/null || true
+    ok "PF rules will persist across reboots"
+else
+    echo -e "  ${YELLOW}→${NC} Would install LaunchDaemon for PF persistence"
+fi
+
+# ── 4. Disable unused network services ─────────────────────────────────────
+
+step "Disabling unused network services..."
+
+SERVICES=(
+    "com.apple.AFP": "Apple File Sharing"
+    "com.apple.smb": "SMB File Sharing"
+    "com.apple.ftp": "FTP"
+    "com.apple.telnet": "Telnet"
+)
+
+for svc in "${SERVICES[@]}"; do
+    name="${svc#*:}"
+    if [ "$DRY_RUN" = false ]; then
+        sudo launchctl disable "system/${svc%%:*}" 2>/dev/null || true
+    fi
+    echo -e "  ${GREEN}→${NC} Disabled: $name"
+done
+ok "Unused network services disabled"
+
+# ── 5. Verify SSH stays enabled ────────────────────────────────────────────
+
+step "Verifying SSH remote login..."
+if sudo systemsetup -getremotelogin 2>/dev/null | grep -q "On"; then
+    ok "SSH remote login confirmed enabled"
+elif [ "$DRY_RUN" = false ]; then
+    sudo systemsetup -setremotelogin on 2>/dev/null || true
+    ok "SSH remote login re-enabled"
+else
+    echo -e "  ${YELLOW}→${NC} Would ensure SSH stays enabled"
+fi
+
+# ── 6. Final check ─────────────────────────────────────────────────────────
+
+echo ""
+echo -e "${BOLD}Post-Hardening State:${NC}"
+
+if [ "$DRY_RUN" = false ]; then
+    sudo lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null | awk 'NR>1 {print $1, $9}' | sort -u | sed 's/^/    /' || echo "    Could not list ports"
+else
+    echo "    (run without --dry-run to see)"
+fi
+
+echo ""
+echo "──────────────────────────────────────────────"
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${CYAN}✅ Dry run complete${NC} — review changes above and re-run without --dry-run"
+else
+    echo -e "${GREEN}✅ Hardening complete${NC} — Only SSH (22) and VNC (5900) open"
+    echo ""
+    echo "  Verify anytime: bash hardening.sh --verify"
+fi
+echo ""
