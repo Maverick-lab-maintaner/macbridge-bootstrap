@@ -2343,4 +2343,18 @@ Before: a proven toolchain nobody could install, and a conversion rate of 0% by 
 
 ---
 
+## Act XXI: Dark Launch — Commerce and Dashboard Built but Deliberately Unwired
+
+**Context:** With v0.1.0 shipped, the founder wanted to test the product *first* — but not lose the build window for the revenue and customer-facing layers. The decision: build both **dark** — code complete, tested, and inert until explicitly activated — so product testing proceeds with zero interference.
+
+**The commerce layer** (`commerce/`): a LemonSqueezy webhook worker (HMAC-SHA256 verified with constant-time comparison, **idempotent per order** because LemonSqueezy retries webhooks, dark-guarded — 503s everything without a signing secret) and the piece that mattered most: **a JavaScript port of the Go license-key math that must stay byte-exact**, or sold keys stop validating in the shipped CLI. Compatibility was pinned two ways: `test-keygen.mjs` embeds five Go-generated keys as vectors (JS must accept them and reproduce each checksum group), and a JS-generated key was validated by the Go `license.Validate` via a throwaway `cmd/tmpvalidate` (`GO ACCEPTS`). The FNV-1a port needed care in JS: `Math.imul(h, 0x01000193) >>> 0` for 32-bit multiply, and rejection sampling for uniform alphabet draws (256 % 30 ≠ 0). Activation is a 30-minute runbook in `commerce/README.md`.
+
+**The dashboard** (`landing/dashboard/` + `dashboard/customer-api.js`): V1 of `WEBSITE_DASHBOARD_SPEC.md` as a demo-mode page in the site's design system — noindex, unlinked from the nav, with a state switcher previewing every UX state (SLA gate, provisioning, ready, degraded, blocked, tooling-tier) from embedded sample payloads shaped exactly like the future API response. The API worker composes status contract + lease + SLA + license from KV, computes the **24-hour Apple-license floor server-side** so the UI can't get compliance wrong, and refuses all traffic without auth+bindings.
+
+**The operational lesson:**
+
+> "Build dark" is a real option: when testing must come before selling, ship the code with a guard that makes accidental activation impossible, pin cross-language contracts with vectors from the reference implementation, and leave a runbook — the work is banked without the risk.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*

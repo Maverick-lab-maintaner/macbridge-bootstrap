@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!--
+    MacBridge Customer Dashboard V1 — DEMO MODE (BUILT, NOT WIRED)
+
+    Implements docs/WEBSITE_DASHBOARD_SPEC.md as a static page driven by
+    embedded sample data. Not linked from the site nav; the live version
+    swaps `DEMO` for the customer API payload (dashboard/customer-api.js)
+    behind auth. The state switcher exists to preview every UX state.
+  -->
+  <meta name="robots" content="noindex" />
+  <title>MacBridge — Dashboard (demo)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/site.css" />
+  <style>
+    .dash-shell { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+    .dash-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+    .demo-banner { border: 1px dashed var(--warm); color: var(--warm); border-radius: var(--radius-sm); padding: 10px 14px; font-family: var(--font-mono); font-size: .78rem; margin-bottom: 22px; }
+    .state-switch { display: flex; gap: 8px; flex-wrap: wrap; }
+    .state-switch button { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text-soft); cursor: pointer; }
+    .state-switch button.active { border-color: var(--line-strong); color: var(--accent); }
+    .dash-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; }
+    .dash-grid > .panel { padding: 22px; }
+    .dash-full { grid-column: 1 / -1; }
+    .machine-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .state-badge { font-family: var(--font-mono); font-size: .78rem; letter-spacing: .08em; padding: 4px 12px; border-radius: 999px; border: 1px solid; }
+    .state-badge.ready { color: var(--accent-2); border-color: var(--accent-2); }
+    .state-badge.degraded { color: var(--warm); border-color: var(--warm); }
+    .state-badge.blocked { color: var(--danger); border-color: var(--danger); }
+    .check-rows { display: grid; gap: 8px; margin-top: 12px; }
+    .check-row { display: flex; justify-content: space-between; gap: 10px; font-family: var(--font-mono); font-size: .8rem; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    .check-row .val { color: var(--text-muted); }
+    .check-row .st-PASS { color: var(--accent-2); } .check-row .st-WARN { color: var(--warm); } .check-row .st-FAIL { color: var(--danger); }
+    .fact-rows { display: grid; gap: 8px; margin-top: 10px; }
+    .fact-rows div { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: .78rem; }
+    .fact-rows span { color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+    .fact-rows b { color: var(--text); font-weight: 600; }
+    .connect-box { background: var(--panel-soft); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; font-family: var(--font-mono); font-size: .8rem; margin-top: 12px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .connect-box button { border: 1px solid var(--line); background: transparent; color: var(--accent); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-family: var(--font-mono); font-size: .72rem; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .actions .button { padding: 10px 16px; font-size: .82rem; }
+    .actions .button[disabled] { opacity: .45; pointer-events: none; }
+    .lease-bar { height: 8px; border-radius: 999px; background: var(--panel-strong); overflow: hidden; margin: 10px 0 6px; }
+    .lease-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+    .muted { color: var(--text-muted); font-size: .82rem; line-height: 1.55; }
+    .gate-card { text-align: center; padding: 44px 28px; }
+    .hidden { display: none !important; }
+    @media (max-width: 860px) { .dash-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="dash-shell">
+    <div class="demo-banner">DEMO MODE — sample data. Not wired to a live machine or account. State switcher below previews every UX state from the spec.</div>
+
+    <div class="dash-head">
+      <div>
+        <span class="eyebrow">MacBridge</span>
+        <h1 style="margin:4px 0 0">Your workspace</h1>
+      </div>
+      <div class="state-switch" id="switch"></div>
+    </div>
+
+    <!-- SLA gate: blocks everything until Apple's license terms are accepted -->
+    <section id="sla-gate" class="panel gate-card hidden">
+      <span class="mini-title">Before you connect</span>
+      <h2>Accept Apple’s macOS license terms</h2>
+      <p class="muted" style="max-width:520px;margin:10px auto 0">
+        Your dedicated Mac lease requires you to review and accept Apple’s macOS Software
+        License Agreement and the terms of preinstalled software (including Xcode) before
+        first use. This is an Apple requirement for leased Macs, not fine print of ours.
+      </p>
+      <div class="actions" style="justify-content:center;margin-top:22px">
+        <a class="button button-primary" href="https://www.apple.com/legal/sla/" target="_blank" rel="noopener">Review the license</a>
+        <button class="button button-secondary" onclick="setState('ready')">I accept — unlock my Mac</button>
+      </div>
+    </section>
+
+    <div id="dash" class="dash-grid">
+      <!-- A. Machine / access card -->
+      <section class="panel">
+        <div class="machine-head">
+          <span class="mini-title" style="margin:0">Machine</span>
+          <span id="badge" class="state-badge ready">READY</span>
+          <span class="muted" id="machine-id" style="margin-left:auto"></span>
+        </div>
+        <div class="check-rows" id="checks"></div>
+        <div class="connect-box" id="connect-row">
+          <span id="ssh-cmd">ssh dev@203.0.113.47</span>
+          <button onclick="copySSH()">copy</button>
+        </div>
+        <div class="actions" id="actions"></div>
+        <p class="muted" id="next-action" style="margin-top:12px"></p>
+      </section>
+
+      <!-- B. Plan & inclusions (the three facts, always visible) -->
+      <section class="panel">
+        <span class="mini-title">Your plan</span>
+        <h3 id="plan-name" style="margin:6px 0 0"></h3>
+        <div class="fact-rows">
+          <div><span>Mac included</span><b id="fact-mac"></b></div>
+          <div><span>AI tokens</span><b>No — your own keys</b></div>
+          <div><span>License</span><b id="fact-license"></b></div>
+        </div>
+
+        <div id="lease-section">
+          <span class="mini-title" style="margin-top:20px;display:block">Lease window</span>
+          <div class="lease-bar"><i id="lease-fill" style="width:35%"></i></div>
+          <div class="fact-rows">
+            <div><span>Allocated</span><b id="lease-start"></b></div>
+            <div><span>Earliest release</span><b id="lease-min"></b></div>
+            <div><span>Expires</span><b id="lease-end"></b></div>
+          </div>
+          <p class="muted" style="margin-top:8px">Dedicated to you for a minimum of 24 consecutive hours (Apple license requirement). “Stop” keeps it yours; it can’t be reassigned inside the window.</p>
+        </div>
+
+        <span class="mini-title" style="margin-top:20px;display:block">AI configuration</span>
+        <div class="fact-rows">
+          <div><span>Anthropic</span><b id="ai-anthropic"></b></div>
+          <div><span>OpenAI</span><b id="ai-openai"></b></div>
+        </div>
+        <p class="muted" style="margin-top:8px">Model usage is billed by your own provider — MacBridge prepares the environment, never the tokens.</p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    // ── Sample payloads: the shape dashboard/customer-api.js will serve ──
+    const CHECKS_READY = [
+      ["Flutter","PASS","3.44.4"],["Xcode","PASS","26.5"],["Simulator","PASS","iOS 26.2"],
+      ["CocoaPods","PASS","1.16.2"],["Signing","PASS","1 identity"],["Agents","PASS","claude · opencode · codex"],
+    ];
+    const CHECKS_DEGRADED = CHECKS_READY.map(r => r[0]==="CocoaPods" ? ["CocoaPods","FAIL","not in PATH"] : (r[0]==="Signing" ? ["Signing","WARN","cert expires soon"] : r));
+    const CHECKS_BLOCKED  = CHECKS_READY.map(r => ["Flutter","Xcode"].includes(r[0]) ? [r[0],"FAIL","missing"] : r);
+
+    const DEMO = {
+      "sla-gate": null,
+      provisioning: { badge:["PROVISIONING","degraded"], checks:[["Bootstrap","WARN","layer 2 of 4 running…"]], plan:"Build Pass — $29/day", mac:"Included for 24h", lease:true, next:"Your Mac is being prepared. This page updates when it’s verified ready (~10 min).", actions:[["Stop",1],["Reset",1],["Run doctor",1]] },
+      ready:      { badge:["READY","ready"], checks:CHECKS_READY, plan:"Build Pass — $29/day", mac:"Included for 24h", lease:true, next:"No action required. Connect and ship.", actions:[["Stop",0],["Reset",0],["Run doctor",0],["Signing check",0]] },
+      degraded:   { badge:["DEGRADED","degraded"], checks:CHECKS_DEGRADED, plan:"Build Pass — $29/day", mac:"Included for 24h", lease:true, next:"CocoaPods needs attention — run the doctor for a guided fix.", actions:[["Stop",0],["Reset",0],["Run doctor",0],["Signing check",0]] },
+      blocked:    { badge:["BLOCKED","blocked"], checks:CHECKS_BLOCKED, plan:"Build Pass — $29/day", mac:"Included for 24h", lease:true, next:"Critical checks failed. Reset re-provisions from the golden image, or contact support.", actions:[["Stop",0],["Reset",0],["Run doctor",0],["Contact support",0]] },
+      tooling:    { badge:["YOUR MAC","ready"], checks:CHECKS_READY, plan:"Studio Tooling — $19/mo", mac:"Bring your own", lease:false, next:"Run `macbridge status` on your Mac for live health; this view shows your last sync.", actions:[["Setup guide",0],["Run doctor guide",0]] },
+    };
+
+    const STATES = ["sla-gate","provisioning","ready","degraded","blocked","tooling"];
+    function setState(name){
+      document.querySelectorAll("#switch button").forEach(b => b.classList.toggle("active", b.dataset.s===name));
+      const gate = name==="sla-gate";
+      document.getElementById("sla-gate").classList.toggle("hidden", !gate);
+      document.getElementById("dash").classList.toggle("hidden", gate);
+      if (gate) return;
+      const d = DEMO[name];
+      const badge = document.getElementById("badge");
+      badge.textContent = d.badge[0]; badge.className = "state-badge " + d.badge[1];
+      document.getElementById("machine-id").textContent = d.lease ? "mac-47 · Macly M4" : "";
+      document.getElementById("checks").innerHTML = d.checks.map(([l,s,v]) =>
+        `<div class="check-row"><span>${l}</span><span class="val"><span class="st-${s}">${s}</span> · ${v}</span></div>`).join("");
+      document.getElementById("connect-row").classList.toggle("hidden", !d.lease);
+      document.getElementById("lease-section").classList.toggle("hidden", !d.lease);
+      document.getElementById("plan-name").textContent = d.plan;
+      document.getElementById("fact-mac").textContent = d.mac;
+      document.getElementById("fact-license").textContent = "Pro — active";
+      document.getElementById("ai-anthropic").textContent = "Connected (your key)";
+      document.getElementById("ai-openai").textContent = "Not connected";
+      document.getElementById("next-action").textContent = d.next;
+      document.getElementById("actions").innerHTML = d.actions.map(([label,disabled]) =>
+        `<button class="button button-secondary" ${disabled?"disabled":""}>${label}</button>`).join("");
+      if (d.lease) {
+        const now = new Date();
+        document.getElementById("lease-start").textContent = now.toISOString().slice(0,16).replace("T"," ");
+        document.getElementById("lease-min").textContent = new Date(now.getTime()+24*3600e3).toISOString().slice(0,16).replace("T"," ");
+        document.getElementById("lease-end").textContent = new Date(now.getTime()+24*3600e3).toISOString().slice(0,16).replace("T"," ");
+      }
+    }
+    function copySSH(){ navigator.clipboard?.writeText(document.getElementById("ssh-cmd").textContent); }
+
+    document.getElementById("switch").innerHTML = STATES.map(s =>
+      `<button data-s="${s}" onclick="setState('${s}')">${s.replace("-"," ")}</button>`).join("");
+    setState("ready");
+  </script>
+</body>
+</html>
