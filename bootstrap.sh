@@ -9,6 +9,7 @@
 #   bash bootstrap.sh              # Run all layers
 #   bash bootstrap.sh --tier agent # All layers, same as default
 #   bash bootstrap.sh --from 2     # Start from layer 2 (skip machine + Apple)
+#   bash bootstrap.sh --report-to https://dash.example.com/api/report  # Ship logs centrally
 #
 # Architecture:
 #   Layer 0: Machine Reachable  — SSH, disk, ownership, networking
@@ -51,6 +52,7 @@ NC='\033[0m'
 
 START_LAYER=0
 TIER="agent"
+REPORT_URL=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -62,13 +64,19 @@ while [[ $# -gt 0 ]]; do
             TIER="$2"
             shift 2
             ;;
+        --report-to)
+            REPORT_URL="$2"
+            export MACBRIDGE_REPORT_URL="$REPORT_URL"
+            shift 2
+            ;;
         --help|-h)
             echo "Usage: bash bootstrap.sh [options]"
             echo ""
             echo "Options:"
-            echo "  --from N     Start from layer N (0-4)"
-            echo "  --tier TYPE  Provisioning tier (agent = all layers)"
-            echo "  --help       Show this help"
+            echo "  --from N      Start from layer N (0-4)"
+            echo "  --tier TYPE   Provisioning tier (agent = all layers)"
+            echo "  --report-to URL  Ship layer results to central endpoint (POST JSON)"
+            echo "  --help        Show this help"
             exit 0
             ;;
         *)
@@ -99,6 +107,14 @@ echo ""
 
 mkdir -p "$LOG_DIR"
 
+# ── Source shared utilities (centralized logging, webhook reporting) ───────
+
+if [ -f "${LIB_DIR}/_utils.sh" ]; then
+    source "${LIB_DIR}/_utils.sh"
+    # Report bootstrap start to central endpoint if configured
+    report_event "bootstrap_started" "info" "Bootstrap ${TIMESTAMP} starting from layer ${START_LAYER}" "" || true
+fi
+
 # ── Layer execution ────────────────────────────────────────────────────────
 
 # Track results for summary
@@ -128,6 +144,7 @@ run_layer() {
             echo ""
             echo -e "${GREEN}✅ Layer ${num} passed (${LAYER_DURATION}s)${NC}"
             LAYER_STATUS[$num]="PASSED"
+            report_event "bootstrap_layer" "pass" "Layer ${num}: ${name} — ${LAYER_DURATION}s" "$num" || true
             return 0
         else
             LAYER_END=$(date +%s)
@@ -135,6 +152,7 @@ run_layer() {
             echo ""
             echo -e "${RED}❌ Layer ${num} FAILED (${LAYER_DURATION}s)${NC}"
             LAYER_STATUS[$num]="FAILED"
+            report_event "bootstrap_layer" "fail" "Layer ${num}: ${name} — FAILED (${LAYER_DURATION}s)" "$num" || true
             return 1
         fi
     else
@@ -220,6 +238,7 @@ if [ "$FAILED_LAYER" -eq 0 ] && \
     echo ""
     echo -e "  Run ${CYAN}bash verify.sh${NC} to re-check environment health anytime."
     echo ""
+    report_event "bootstrap_complete" "pass" "All 5 layers passed — ${TOTAL_MIN}m ${TOTAL_SEC}s" "" || true
     exit 0
 
 else
@@ -237,5 +256,6 @@ else
     echo -e "${BOLD}${RED}║                                                              ║${NC}"
     echo -e "${BOLD}${RED}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
+    report_event "bootstrap_complete" "fail" "Layer ${FAILED_LAYER} failed" "" || true
     exit 1
 fi
