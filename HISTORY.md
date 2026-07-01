@@ -2155,4 +2155,55 @@ That produced `docs/PRICING_STRATEGY.md`: four compliant options with worked per
 
 ---
 
+## Act XVII: The Pivot — From Infrastructure to Software, and the Realization That Nothing Was Wasted
+
+**Context:** Act XVI killed the multi-tenant margin model. This act answers the question it left open — *"so what business is this?"* — and the answer reframed the whole company: **stop selling the Mac, sell the software that runs on any Mac.** The twist is how *little* had to change to get there: the tooling built over the previous acts *is* the product.
+
+### The sentence that reframed everything
+
+A reviewer's analysis crystallized it: *"You don't have a legal problem, you have a pricing-structure problem."* Yesterday's fear was "Apple might kill the business." After the license read it became "Apple **defines** which business model is allowed" — and the model it most cleanly permits (software on a customer-provided, compliant Mac) is also the highest-margin and hardest to copy. That produced `docs/BUSINESS_MODELS.md`: four models compared, and a decision — **two products on one codebase, ship software-first.**
+
+- **Studio** (software, ship now): the CLI + tooling on any Mac the customer provides — cloud *or* a Mac they own. ~92% margin, zero Apple exposure.
+- **Managed** (hosted, later): we provision a dedicated ≥24h Mac. A convenience layer, not the company.
+
+### The realization: the session's work *was* the product all along
+
+The pivot did not discard anything. Every tool built across Acts XI–XVI — the status contract, `doctor` + `doctor-rules.json`, `signing-doctor`, `readiness`, `workspace-setup`, `golden-image`, the agent-ready setup — is exactly what Studio ships. The only thing that changed is the *framing*: from "we host a Mac" to "we are the continuously verified workspace that runs on your Mac." Even the old tagline got rewritten to match: *"The product isn't the Mac. The product is the continuously verified development workspace."*
+
+The under-appreciated consequence: **software-first expands the market.** Someone who already owns a Mac mini or Mac Studio — previously *excluded* from a hosting product — can now buy Studio for the doctor flows, prepared workspace, signing diagnosis, and updates. `docs/PERSONAS.md` re-read the three original personas through one new question — *do they already have a Mac?* — and found the launch persona: **AI-native builders who already run agents on their own Mac.** The classic "Windows dev with no Mac" persona is the one that still needs Managed (the strongest argument for building it later), so the site now leads with Studio and puts Managed on a waitlist.
+
+### The site was teaching a dead — and dangerous — model
+
+The landing page still sold a single `$19/mo` offer and was silent on three things a buyer must know: **what you're buying, whether the Mac is included, whether AI tokens are included.** The AI ambiguity was the dangerous one — implying bundled Claude/OpenAI usage would make margins unpredictable overnight. The fix: three explicit pricing cards each with a Mac + AI-keys fact row, Studio featured and available, Managed marked "coming soon," and a consistent line everywhere — *agent-ready environment, bring your own keys, tokens billed by your provider.* Three blog posts even implied `$19` *included* a Mac (it doesn't — that's the BYO tooling tier); all were corrected. `docs/STUDIO_PACKAGING.md` then set the build path: elevate the Go `macbridge` CLI from stub to the install target, with distribution (Homebrew/notarized pkg), a license gate (offline grace, free/Pro), and an **updates/knowledge channel** — the thing that makes a subscription recur.
+
+### Reconciling a collaborator's docs — merge, don't clobber
+
+Mid-stream, the collaborator dropped their own `WEBSITE_DASHBOARD_SPEC.md` and `product-surface-summary.md` into the tree, overlapping a `DASHBOARD_SPEC.md` written earlier. The right move was not to defend the earlier draft: their spec was more complete, so it became canonical, the two genuinely-unique bits from the earlier one (the repo-signal mapping table and the concrete lease/SLA/read-API pieces) were folded in, and the duplicate was deleted. Reconciling overlapping work by keeping the better base and grafting the unique value is its own small discipline.
+
+### The process twist: a chronicle split across branches
+
+Writing *this* act surfaced a git-hygiene problem. The HISTORY chronicle had fragmented: `master` was at Act XV, Act XVI lived only in the open PR #8, and the working branch was at XV. Adding Act XVII on that branch would have *skipped* XVI and produced a merge conflict at the footer (two acts inserted at the same anchor). The fix was to stop stacking and **consolidate first**: merge the two done, green docs/site PRs (#8, #9) so `master` carried a coherent XV→XVI, then write Act XVII on a clean base. Lesson: a chronicle-in-flight is a shared, append-at-one-point file — let too many branches touch its tail and it conflicts with itself.
+
+### Testing the product without spending money
+
+A parallel question: validate before renting a Mac. The answer had three surfaces, and one non-obvious winner. WSL/Windows validates the *portable logic* (contract emission, readiness rendering from mock JSON, Radar pytest, Go tests, `bash -n`, the `provision.ps1` AST parse) but not the macOS-only path. A macOS **VM on Windows violates Apple's SLA** (§2B — Apple-branded hardware only), so it is out. The winner: **GitHub Actions `macos-latest` runners — free, license-clean, real Apple hardware with Xcode/Homebrew/Ruby/CocoaPods preinstalled.** A new `macos-smoke.yml` (manual `workflow_dispatch`) runs `verify`/`doctor`/`signing-doctor`/`readiness`/`golden-image manifest` on real macOS and asserts each emits a valid contract — so almost everything can be proven for $0, and a Mac is rented only for the interactive/GUI/real-device parts CI can't give.
+
+### Exact toolchain used in this pass
+
+- `gh pr merge --squash --delete-branch` to consolidate #8/#9 before extending the chronicle; `gh pr view --json mergeable` to check state first
+- `WebSearch`/`Grep` over the KnowledgeBase to recover the three canonical personas
+- landing-page + CSS edits (three explicit pricing cards, `soon` state); blog corrections
+- new docs: `BUSINESS_MODELS.md`, `STUDIO_PACKAGING.md`, `PERSONAS.md`, `LOCAL_TESTING.md`; reconciled `WEBSITE_DASHBOARD_SPEC.md`; new CI `macos-smoke.yml`
+
+### What this changed
+
+Before: MacBridge was a hosting business with a dead margin model and a site that sold it ambiguously. After: it is a **software-first product** — Studio now, Managed later — with the personas, pricing, site, packaging path, and a free macOS test bed all pointing the same direction. The code didn't change; the company did.
+
+### The operational lesson
+
+> When the business model breaks, check whether the *product* actually has to change — often it only has to be reframed.
+> Every tool built for "we host the Mac" was already the tool for "we are the workspace that runs on your Mac." The pivot was a sentence, not a rewrite. And when you pivot, re-read your personas through the new question — here, *"do they already have a Mac?"* — because it tells you exactly who to launch to first.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*

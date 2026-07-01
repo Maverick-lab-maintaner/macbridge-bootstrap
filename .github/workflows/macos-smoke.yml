@@ -1,0 +1,58 @@
+name: macOS Smoke (free Apple-hardware test bed)
+
+# Manual on purpose: macOS runner minutes are limited, so run it on demand from the
+# Actions tab ("Run workflow"). This validates the tooling on REAL macOS without renting
+# a Mac — see docs/LOCAL_TESTING.md.
+on:
+  workflow_dispatch:
+    inputs:
+      run_bootstrap:
+        description: "Also install Flutter and run bootstrap --from 2 (slower)"
+        type: boolean
+        default: false
+
+jobs:
+  smoke:
+    name: Tooling runs on real macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Environment info
+        run: |
+          sw_vers
+          xcodebuild -version || true
+          echo "ruby: $(ruby --version)"; echo "pod: $(pod --version 2>/dev/null || echo none)"
+
+      # Each tool may exit non-zero on a degraded/blocked state (expected without Flutter/
+      # certs). We only assert it RUNS and emits a VALID status contract.
+      - name: verify.sh emits a valid contract
+        run: |
+          bash verify.sh --json > /tmp/verify.json || true
+          python3 -c "import json; d=json.load(open('/tmp/verify.json')); print('verify state:', d['summary']['state'])"
+
+      - name: doctor.sh emits valid JSON
+        run: |
+          bash doctor.sh --json > /tmp/doctor.json || true
+          python3 -c "import json; d=json.load(open('/tmp/doctor.json')); print('doctor issues:', d.get('issue_count'))"
+
+      - name: signing-doctor.sh emits a valid contract
+        run: |
+          bash signing-doctor.sh --json > /tmp/signing.json || true
+          python3 -c "import json; d=json.load(open('/tmp/signing.json')); print('signing state:', d['summary']['state'])"
+
+      - name: readiness.sh renders
+        run: bash readiness.sh --quick || true
+
+      - name: golden-image.sh manifest is valid JSON
+        run: |
+          bash golden-image.sh manifest > /tmp/manifest.json
+          python3 -c "import json; d=json.load(open('/tmp/manifest.json')); print('xcode:', d['components']['xcode'])"
+
+      # Optional: the closest thing to a rented Mac, for $0.
+      - name: bootstrap smoke (opt-in)
+        if: ${{ inputs.run_bootstrap }}
+        run: |
+          brew install --cask flutter || true
+          bash bootstrap.sh --from 2 --tier vanilla || true
+          bash verify.sh || true
