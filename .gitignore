@@ -6,6 +6,6 @@ logs/*
 # Watcher state files (version tracking cache)
 .cache/
 
-# Go build artifacts
-macbridge.exe
-macbridge
+# Go build artifacts (binary only, not source directory)
+/macbridge
+/macbridge.exe
