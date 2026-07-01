@@ -33,8 +33,15 @@ Legend: `[ ]` open · `[x]` done · `[~]` deferred (needs API/scale work) · `[!
 
 ## C. Deploy prerequisites (manual / strategic — cannot be coded here)
 
-- [!] **S1 — Apple ToS due diligence (30 min).** Marked ❌ *Not done* in
-  `HONEST_ASSESSMENT.md`. Existential risk, cheap to check. **Do before charging anyone.**
+- [x] **S1 — Apple ToS due diligence.** Done — see `docs/APPLE_LICENSE_COMPLIANCE.md`.
+  **Key finding:** cloud Mac is legal under the macOS SLA Section 3 ("Leasing for Permitted
+  Developer Services"), and MacBridge's *purpose* fits it. **But** the license requires each
+  end user to have **sole and exclusive use of a dedicated Mac for ≥24 consecutive hours**
+  and prohibits **time-sharing / terminal-sharing / service bureau** — so the
+  10-users-per-Mac / $8.90-COGS model in `COST_BENEFIT_RISK_ANALYSIS.md` is **not
+  compliant**. Viable only 1 customer : 1 dedicated Mac (≥24h), which means COGS ≈ a whole
+  Mac (~$89/mo), not a tenth. **Repricing required before charging; get a lawyer to review
+  the sublease chain.** (Not legal advice.)
 - [~] **S2 — Golden image + auto-arranged workspace.** Tooling built:
   `readiness.sh` (the "🟢 MacBridge Ready" screen rendered from the status contract),
   `workspace-setup.sh` (LaunchAgent opens Terminal + boots the Simulator on login; a
@@ -81,16 +88,17 @@ Everything **left needs the real world** — a Mac, a provider, or beta users.
 | [#2](https://github.com/Maverick-lab-maintaner/macbridge-bootstrap/pull/2) | **S2 tooling** | `readiness.sh` (Ready screen), `workspace-setup.sh` (prepared studio), `golden-image.sh` (build/verify/manifest) |
 | [#3](https://github.com/Maverick-lab-maintaner/macbridge-bootstrap/pull/3) | **SH1** | cleared all ShellCheck warnings; gate enforced at `severity: warning` |
 
-Done item IDs: **W1, W2, W3, W4, S4, S2 (tooling), SH1.** CI is green and now genuinely
-enforced. Caveat: `provision.ps1`, `signing-doctor.sh`, and the S2 scripts are validated
+Done item IDs: **W1, W2, W3, W4, S4, S2 (tooling), SH1, S1 (research).** CI is green and
+now genuinely enforced. S1 surfaced a new business blocker — **S7 (reprice for 1:1
+dedicated Macs)** — because the multi-tenant COGS model is not license-compliant. Caveat: `provision.ps1`, `signing-doctor.sh`, and the S2 scripts are validated
 locally (AST parser, mocked contracts, `--dry-run`) but **not yet run on a real Mac**.
 
 ### Left — all blocked on real-world inputs (no more code I can write)
 
 | ID | Item | Blocked on |
 |----|------|-----------|
-| S1 | Apple ToS due diligence | 30-min human research. **Gates charging anyone — do this first.** |
 | S2 (finish) | Golden image **snapshot** | Install Xcode via GUI once + snapshot via provider console. `golden-image.sh build` guides it. |
+| S7 (new) | **Reprice for 1:1 dedicated Macs** | Consequence of S1: the multi-tenant COGS model is not license-compliant. Business decision + lawyer review of the sublease chain. |
 | W5 / S3 | Provider API + multi-provider test | A chosen provider (Macly/VPSMAC) + API keys. |
 | S5 | Usage instrumentation | A running beta Mac to measure (`healthd` already emits usage events to build on). |
 | S6 | Conversion measurement | Real beta users. |
