@@ -2404,4 +2404,45 @@ OK  codex    -> /opt/homebrew/bin/codex
 
 ---
 
+## Act XXIII: The Maintenance Answer — Scheduling What Was Already Built
+
+**Context:** The founder asked the question the original critique had planted months earlier: *"do I have the maintenance problem?"* — the "Xcode 27 drops at 3am, who catches it?" scenario from `HONEST_ASSESSMENT.md` Gap 1. The honest audit found something pleasing and something embarrassing in equal measure: **the designed safety net already existed as code — it just had no schedule.** Two workflows later, the maintenance layer runs itself for $0.
+
+### Realization 1: the Build Verification Agent was three lines of cron away
+
+`MAINTENANCE_AGENT_ARCHITECTURE.md` had long specified a "nightly clean-Mac build" as the safety net of last resort. Nobody had noticed that `macos-smoke.yml` — built in Act XVII as a manual test bed, hardened through Acts XVIII–XXII into a strict agent-tier gate — **was that agent, minus the trigger.** Adding `schedule: cron "17 5 * * *"` turned it into the real thing: every night, a clean Apple runner executes the full agent-tier `macbridge install` through a real `flutter build ios` plus the strict agents-resolve check. Red run → GitHub emails the owner — a delivery path already *proven*, because the founder had received exactly such an email from a genuine failure the day before.
+
+One quirk mattered: on `schedule` events, `workflow_dispatch` inputs are **empty strings**, so every condition and value needed the dual form — `if: inputs.run_bootstrap || github.event_name == 'schedule'` and `--tier "${{ inputs.tier || 'agent' }}"` — or the nightly run would have executed the no-op path forever while looking green.
+
+### Realization 2: the watchers had been standalone scripts since v2
+
+`lib/watcher-xcode.sh` and `lib/watcher-flutter.sh` (CHANGELOG v2, "release watchers") queried real feeds — xcodereleases.com and Flutter's release JSON — and kept a last-seen baseline in gitignored `.cache/` files. They had a `--install-cron` mode for a Mac that didn't exist yet, and had never been scheduled anywhere. Both still worked when run live (Xcode 26.6, Flutter 3.44.4 — matching the golden-image pins exactly).
+
+`release-watchers.yml` now runs them **every Monday 06:00 UTC on ubuntu-latest** — they're pure curl+python, so no Mac minutes at all.
+
+### The twist: "alert exactly once" is a state-persistence problem
+
+The design goal: a new upstream release should turn the run red **once** (the red run *is* the alert — GitHub's failure email), then go green until the next release. That collides with two GitHub Actions realities:
+
+1. **Caches are immutable per key** — you can't update a cache in place. The pattern: restore with a prefix (`restore-keys: watchers-state-`), save under a fresh key (`watchers-state-${{ github.run_id }}`) each run, so the newest baseline always wins.
+2. **The default cache post-save skips on job failure** — and the alert *is* a failure. Naively, the alerting run would die before saving its advanced baseline, and every subsequent Monday would re-alert forever (or, with the state file updated but unsaved, oscillate). The fix: split into explicit `actions/cache/restore` + `actions/cache/save` with **`if: always()`**, and order the steps so the baseline advances *before* the deliberate `exit 1`. The watcher scripts already updated their state file on detection; the workflow just had to promise that update survives the red exit.
+
+The two workflows also split the signal cleanly, which is the actual answer to the maintenance question:
+
+> **The watcher says "something shipped." The nightly smoke says "did it break us."**
+> A Monday email about Xcode 27 arrives with last night's run already showing whether the pipeline survived it.
+
+### Verification
+
+- Watchers run live locally against both feeds before scheduling (baselines matched the golden-image pins — no false alert waiting to fire).
+- The workflow was dispatched once after merge to **seed the CI baseline**: green in 8 seconds, cache saved.
+- What remains genuinely un-automatable, recorded in the shortlist's maintenance-posture note: the *discipline* of turning every caught breakage into a `doctor-rules.json` entry (11 rules today; the moat thesis needs that habit), the customer-notification flow (matters only when Managed customers exist), and single-maintainer risk.
+
+### The operational lesson
+
+> Before building the maintenance system, check whether you already built it — the gap between "designed" and "running" was a cron line, not a project.
+> And "alert exactly once" is a statement about *when state persists relative to failure*: if the alert is a red run, the baseline must be saved with `if: always()` and advanced before the exit, or the alarm either repeats forever or never fires again.
+
+---
+
 *Built by Sisyphus at Maverix Labs. Source: Phase 0 provisioning on Macly M4 ($14.99/day). 813-line journal. 1,040-line terminal log. 10 lessons. 20 commits.*
