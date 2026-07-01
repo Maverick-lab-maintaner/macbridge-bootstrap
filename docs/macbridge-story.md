@@ -264,6 +264,34 @@ The rule this chapter earned:
 > when you fix a bug class, sweep for the class — not the instance —
 > and make the product surface itself the regression test
 
+### 13. The agent tier became real — after two hallucinated packages
+
+The onboarding design always said "choose your AI agent," but the installer
+forced all three. Building the choice (a TUI in `macbridge install`, an
+`--agents` flag, a `wants()` gate in Layer 3) exposed something worse:
+
+- OpenCode's install line was broken syntax (`npm install -g @ oh-my-opencode/cli`
+  — a space after the `@`) with wrong-org fallbacks
+- Codex's install used hallucinated package names entirely
+
+Two of the three advertised agents could never have installed, and the layer
+only warned — every agent-tier customer would have received a Mac where
+`opencode` and `codex` silently didn't exist. Same failure genus as the
+`httpx2` typosquat: made-up package names, this time in install scripts.
+
+The real names (`opencode-ai`, `@openai/codex`) went in, a strict CI step now
+requires all three binaries to resolve, and the smoke ran on a real Mac:
+
+> 🟢 MAC READY — agent tier
+> claude, opencode, and codex all on PATH
+
+The first agent-tier readiness in the project's history — the vibecoder
+differentiator demonstrated, not described. The rule:
+
+> install lines are claims about the outside world — verify package names
+> against the real registry, and make the quiet warn-and-continue failure
+> a loud red in CI
+
 ## What Broke, and What It Taught
 
 ### Shell is good at orchestration
