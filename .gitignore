@@ -2,3 +2,10 @@
 logs/*.log
 logs/*
 !logs/.gitkeep
+
+# Watcher state files (version tracking cache)
+.cache/
+
+# Go build artifacts
+macbridge.exe
+macbridge

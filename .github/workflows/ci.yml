@@ -1,0 +1,72 @@
+name: MacBridge CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - '**.sh'
+      - '**.ps1'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - '**.sh'
+      - '**.ps1'
+
+jobs:
+  shellcheck:
+    name: ShellCheck Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          format: tty
+          severity: warning
+          ignore_paths: '.git .cache'
+
+  syntax-check:
+    name: Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check all .sh scripts parse without errors
+        run: |
+          echo "Checking all shell scripts for syntax errors..."
+          FAILED=0
+          while IFS= read -r -d '' script; do
+            echo -n "  $script ... "
+            if bash -n "$script" 2>&1; then
+              echo "OK"
+            else
+              echo "FAILED"
+              FAILED=1
+            fi
+          done < <(find . -name '*.sh' -not -path './.git/*' -not -path './.cache/*' -print0)
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::One or more scripts have syntax errors"
+            exit 1
+          fi
+          echo "All scripts passed syntax validation."
+
+      - name: Validate PowerShell syntax (provision.ps1)
+        if: false  # Disabled on Linux runner — no pwsh parser without PowerShell
+        run: echo "Skipping PowerShell check on Linux runner"
+
+  test-harness:
+    name: Test Harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run test harness
+        run: |
+          if [ -f test/run-tests.sh ]; then
+            bash test/run-tests.sh
+          else
+            echo "No test harness found."
+          fi
