@@ -166,6 +166,49 @@ The live edge now does three things:
 That is the right shape for a first connector.
 It is useful enough to prove the concept and constrained enough to stay safe.
 
+### 9. The license read reset the business model
+
+The repo finally read Apple's actual macOS license instead of fearing it.
+
+The finding was not "cloud Mac is illegal."
+It was narrower and sharper:
+
+- Section 3 explicitly permits leasing a Mac for developer services
+- but each user must have sole and exclusive use of a dedicated Mac
+- for a minimum of twenty-four consecutive hours
+- and time-sharing, terminal-sharing, and service-bureau use are prohibited
+
+That killed the old plan's economics.
+The "ten users share one Mac at $8.90 each" model was never allowed.
+
+So the fear was misplaced.
+The law was never the risk.
+The multi-tenant margin assumption was.
+
+### 10. The pivot to software-first
+
+The reframe was: this is a pricing-structure problem, not a legal one.
+
+The answer became two products on one codebase:
+
+- MacBridge Studio: the software, on any Mac the customer provides
+- MacBridge Managed: a dedicated 24-hour Mac we provision, added later
+
+The important part is what did not change.
+
+Every tool built earlier — bootstrap, doctor, signing diagnosis, readiness,
+workspace, golden image, agent-ready setup — is exactly what Studio ships.
+The pivot was a reframing, not a rewrite.
+
+It also widened the market.
+Someone who already owns a Mac mini or Mac Studio can now buy the workspace,
+not just cloud-Mac renters.
+
+The product definition matured with it:
+
+> the product is not the Mac
+> the product is the continuously verified development workspace
+
 ## What Broke, and What It Taught
 
 ### Shell is good at orchestration
