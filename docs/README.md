@@ -10,5 +10,6 @@
 - [Release Checklist](./RELEASE_CHECKLIST.md) - the 10-minute runbook: Homebrew tap setup, cutting v0.1.0, verification, beta key onboarding
 - [Go-to-Market](./GO_TO_MARKET.md) - how Radar finds customers and the funnel into the compliant tiers
 - [Local Testing](./LOCAL_TESTING.md) - validate on WSL + free GitHub Actions macOS runners before renting a Mac
+- [Real-Mac Test Script](./REAL_MAC_TEST_SCRIPT.md) - the $15 Macly day: every promise validated in one session, with pass criteria and a scorecard
 - [Website and Dashboard Spec](./WEBSITE_DASHBOARD_SPEC.md) - what the site and first customer control plane must clarify now
 - [Product Surface Summary](./product-surface-summary.md) - short version of the public-facing pricing and AI model
