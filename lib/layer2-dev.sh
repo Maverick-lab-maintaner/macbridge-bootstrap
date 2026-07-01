@@ -52,7 +52,7 @@ ensure_path() {
 step "Checking Homebrew..."
 
 if command -v brew > /dev/null 2>&1; then
-    BREW_VERSION=$(brew --version 2>/dev/null | head -1)
+    BREW_VERSION=$(brew --version 2>/dev/null | head -1 || true)
     ok "Homebrew installed: ${BREW_VERSION}"
 else
     step "Installing Homebrew..."
@@ -129,14 +129,14 @@ fi
 step "Checking Flutter SDK..."
 
 if command -v flutter > /dev/null 2>&1; then
-    FLUTTER_VERSION=$(flutter --version 2>/dev/null | head -1)
+    FLUTTER_VERSION=$(flutter --version 2>/dev/null | head -1 || true)
     ok "Flutter installed: ${FLUTTER_VERSION}"
 else
     step "Installing Flutter via Homebrew..."
     brew install --cask flutter 2>/dev/null || true
 
     if command -v flutter > /dev/null 2>&1; then
-        FLUTTER_VERSION=$(flutter --version 2>/dev/null | head -1)
+        FLUTTER_VERSION=$(flutter --version 2>/dev/null | head -1 || true)
         ok "Flutter installed: ${FLUTTER_VERSION}"
     else
         fail "Flutter installation failed"
@@ -248,7 +248,7 @@ fi
 # ── 9. Install GitHub CLI (for device flow auth) ──────────────────────────
 step "Checking GitHub CLI..."
 if command -v gh > /dev/null 2>&1; then
-    GH_VERSION=$(gh --version 2>/dev/null | head -1)
+    GH_VERSION=$(gh --version 2>/dev/null | head -1 || true)
     ok "GitHub CLI installed: ${GH_VERSION}"
 else
     step "Installing GitHub CLI..."

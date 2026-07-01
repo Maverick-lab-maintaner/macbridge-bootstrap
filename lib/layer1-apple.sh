@@ -126,7 +126,7 @@ step "Checking iOS Simulator runtime..."
 SIMULATOR_RUNTIMES=$(xcrun simctl list runtimes 2>/dev/null | grep -c "iOS" || echo "0")
 
 if [ "$SIMULATOR_RUNTIMES" -gt 0 ]; then
-    RUNTIME_INFO=$(xcrun simctl list runtimes 2>/dev/null | grep "iOS" | head -1 | sed 's/^[[:space:]]*//')
+    RUNTIME_INFO=$(xcrun simctl list runtimes 2>/dev/null | grep "iOS" | head -1 | sed 's/^[[:space:]]*//' || true)
     ok "iOS Simulator runtime found: ${RUNTIME_INFO}"
 else
     warn "No iOS Simulator runtime found — attempting download..."
