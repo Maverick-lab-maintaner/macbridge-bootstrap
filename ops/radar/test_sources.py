@@ -14,7 +14,7 @@ import radar  # noqa: E402
 import sources  # noqa: E402
 
 
-def test_fetch_hackernews_query_maps_hits_to_raw_leads() -> None:
+def test_fetch_reddit_query_maps_hits_to_raw_leads() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/search.rss"
         assert request.url.params["q"] == "flutter ios build windows"
@@ -38,7 +38,7 @@ def test_fetch_hackernews_query_maps_hits_to_raw_leads() -> None:
 
     transport = httpx.MockTransport(handler)
     with httpx.Client(transport=transport) as client:
-        items = sources.fetch_hackernews_query(client, "flutter ios build windows", limit=2)
+        items = sources.fetch_reddit_query(client, "flutter ios build windows", limit=2)
 
     assert len(items) == 1
     lead = items[0]
@@ -51,12 +51,12 @@ def test_fetch_hackernews_query_maps_hits_to_raw_leads() -> None:
     assert lead.captured_at == "2026-07-01T12:30:00Z"
 
 
-def test_run_scan_can_include_hackernews_results(tmp_path, monkeypatch) -> None:
+def test_run_scan_can_include_reddit_results(tmp_path, monkeypatch) -> None:
     queries_path = tmp_path / "queries.json"
     queries_path.write_text(json.dumps({"direct_pain": ["flutter ios build windows"]}), encoding="utf-8")
     out_dir = tmp_path / "out"
 
-    def fake_load_hackernews_searches(queries: dict[str, list[str]], limit: int) -> list[sources.RawLead]:
+    def fake_load_reddit_searches(queries: dict[str, list[str]], limit: int) -> list[sources.RawLead]:
         assert queries["direct_pain"] == ["flutter ios build windows"]
         assert limit == 1
         return [
@@ -71,9 +71,9 @@ def test_run_scan_can_include_hackernews_results(tmp_path, monkeypatch) -> None:
             )
         ]
 
-    monkeypatch.setattr(radar, "load_hackernews_searches", fake_load_hackernews_searches)
+    monkeypatch.setattr(radar, "load_reddit_searches", fake_load_reddit_searches)
 
-    exit_code = radar.run_scan([], "", str(queries_path), str(out_dir), hn=True, hn_limit=1)
+    exit_code = radar.run_scan([], "", str(queries_path), str(out_dir), reddit=True, reddit_limit=1)
 
     assert exit_code == 0
     queue = json.loads((out_dir / "review-queue.json").read_text(encoding="utf-8"))

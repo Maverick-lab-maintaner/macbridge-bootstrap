@@ -36,12 +36,12 @@ def load_manual_files(paths: list[Path]) -> list[RawLead]:
     return items
 
 
-def load_hackernews_searches(queries: dict[str, list[str]], limit: int = 5) -> list[RawLead]:
+def load_reddit_searches(queries: dict[str, list[str]], limit: int = 5) -> list[RawLead]:
     items: list[RawLead] = []
     seen: set[RawLead] = set()
-    with create_hackernews_client() as client:
-        for query in build_hackernews_queries(queries):
-            for item in fetch_hackernews_query(client, query, limit):
+    with create_http_client() as client:
+        for query in build_search_queries(queries):
+            for item in fetch_reddit_query(client, query, limit):
                 if item not in seen:
                     seen.add(item)
                     items.append(item)
@@ -52,7 +52,7 @@ def load_feeds(path: Path) -> list[RawLead]:
     if not path.exists():
         return []
     leads: list[RawLead] = []
-    with create_hackernews_client() as client:
+    with create_http_client() as client:
         for raw_line in path.read_text(encoding="utf-8").splitlines():
             line = raw_line.strip()
             if line and not line.startswith("#"):
@@ -60,7 +60,7 @@ def load_feeds(path: Path) -> list[RawLead]:
     return leads
 
 
-def build_hackernews_queries(queries: dict[str, list[str]]) -> list[str]:
+def build_search_queries(queries: dict[str, list[str]]) -> list[str]:
     bucket_queries: list[str] = []
     for bucket in SEARCH_BUCKETS:
         tokens: list[str] = []
@@ -72,7 +72,7 @@ def build_hackernews_queries(queries: dict[str, list[str]]) -> list[str]:
     return dedupe(bucket_queries)
 
 
-def create_hackernews_client() -> httpx.Client:
+def create_http_client() -> httpx.Client:
     transport = httpx.HTTPTransport(
         http2=True,
         retries=3,
@@ -93,14 +93,14 @@ def create_hackernews_client() -> httpx.Client:
 
 
 def log_request(request: httpx.Request) -> None:
-    LOGGER.info("HN request %s", request.url)
+    LOGGER.info("search request %s", request.url)
 
 
 def log_response(response: httpx.Response) -> None:
-    LOGGER.info("HN response %s %s", response.status_code, response.request.url)
+    LOGGER.info("search response %s %s", response.status_code, response.request.url)
 
 
-def fetch_hackernews_query(client: httpx.Client, query: str, limit: int) -> list[RawLead]:
+def fetch_reddit_query(client: httpx.Client, query: str, limit: int) -> list[RawLead]:
     try:
         response = client.get(
             REDDIT_SEARCH_URL,
@@ -117,40 +117,6 @@ def fetch_hackernews_query(client: httpx.Client, query: str, limit: int) -> list
         return []
     root = element_tree.fromstring(response.text.encode("utf-8"))
     return parse_atom_items(root, platform="reddit", author="reddit", source_type="search_result")
-
-
-def parse_hackernews_hit(hit: dict[str, str | list[str]]) -> RawLead:
-    title = first_text(hit, ("title", "story_title"))
-    text = first_text(hit, ("story_text", "comment_text", "text"))
-    url = first_text(hit, ("story_url", "url"))
-    author = first_text(hit, ("author",))
-    captured_at = first_text(hit, ("created_at",))
-    source_type = first_text(hit, ("source_type",))
-    if not source_type:
-        tags = hit.get("_tags", [])
-        if isinstance(tags, list) and tags:
-            source_type = str(tags[0])
-        else:
-            source_type = "hn_hit"
-    return RawLead(
-        platform="hackernews",
-        author=author or "unknown",
-        url=url,
-        title=title,
-        text=text,
-        captured_at=captured_at or now_iso(),
-        source_type=source_type,
-    )
-
-
-def first_text(hit: dict[str, str | list[str]], keys: tuple[str, ...]) -> str:
-    for key in keys:
-        value = hit.get(key, "")
-        if isinstance(value, str):
-            text = value.strip()
-            if text:
-                return text
-    return ""
 
 
 def fetch_feed_safe(client: httpx.Client, url: str) -> list[RawLead]:
