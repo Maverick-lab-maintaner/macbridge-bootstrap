@@ -253,6 +253,35 @@ bash cleanup.sh --force      # Skip confirmation
 bash cleanup.sh --dry-run    # Preview without changes
 ```
 
+## Golden Image (golden-image.sh)
+
+Stage 1 of the pipeline, codified. Turns a fresh Mac with Xcode GUI-installed into a verified, workspace-arranged image that is ready to snapshot. The one manual step — installing Xcode from the App Store and taking the provider snapshot — is guided, not automated.
+
+```bash
+bash golden-image.sh build --tier agent --version v3   # bootstrap → verify → workspace → manifest → snapshot guidance
+sudo bash golden-image.sh manifest                     # print this machine's version manifest (JSON)
+bash golden-image.sh verify --manifest /etc/macbridge-manifest.json  # drift-check against a saved manifest
+```
+
+`build` refuses to declare the image ready unless `verify.sh` reports `ready`. It writes `/etc/macbridge-manifest.json` (exact component versions) and tags `/etc/macbridge-version` (via `migrate.sh`), so `golden-image.sh verify` can later detect drift.
+
+### The prepared studio (workspace-setup.sh + readiness.sh)
+
+`workspace-setup.sh` makes first login feel like walking into a studio that was prepared before you arrived: a LaunchAgent opens Terminal and boots the Simulator on login, and a `~/.zprofile` hook greets every login shell (Terminal window or SSH session) with the readiness screen.
+
+```bash
+bash workspace-setup.sh                 # install (device auto-picked)
+bash workspace-setup.sh --dry-run       # preview without changes
+bash workspace-setup.sh --uninstall     # remove the configuration
+```
+
+`readiness.sh` renders the "🟢 MacBridge Ready" screen from the same status contract as `verify.sh` — a green checklist of Flutter/Xcode/Simulator/CocoaPods/agents with the machine state, instead of a bare shell prompt.
+
+```bash
+bash readiness.sh            # verify and render
+bash readiness.sh --quick    # faster
+```
+
 ## Signing Diagnosis (signing-doctor.sh)
 
 Read-only diagnosis of iOS code-signing readiness. It inspects signing identities and provisioning profiles, and — given a project — its bundle identifier and development team, then explains what to fix. It **never** creates certificates or provisioning profiles, never touches your Apple Developer account, and never stores credentials.

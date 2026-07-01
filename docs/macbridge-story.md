@@ -244,7 +244,14 @@ The project grew from:
 - into a Windows bridge
 - into a health and hardening surface
 - into a lead-intel and reply-assist module
+- into a golden-image builder that codifies the "prepared studio" and shrinks the
+  manual work to its irreducible core (install Xcode once, snapshot once)
 
 The common rule across all of it is the same:
 
 > if a step cannot be verified, it is not finished
+
+And a second rule earned building the golden image:
+
+> some of the product is un-codeable — so make the code shrink the manual part to
+> exactly its core, and make everything around it reproducible and verifiable
