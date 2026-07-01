@@ -10,6 +10,10 @@ logs/*
 /macbridge
 /macbridge.exe
 
+# Release build outputs — keep the Homebrew formula template
+dist/*
+!dist/homebrew/
+
 # Python caches
 __pycache__/
 *.py[cod]

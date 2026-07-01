@@ -118,6 +118,14 @@ first 🟢 MAC READY in the project's history** (run 28546747490, $0). See `HIST
 Act XVIII. Still untested on a real Mac: `workspace-setup.sh` login behaviour and
 `provision.ps1` against a live host (both need GUI/SSH, not CI).
 
-**Next moves:** decide the S7 tier structure (business), then Studio packaging P0
-(`docs/STUDIO_PACKAGING.md`). When you have a Mac with GUI access, `golden-image.sh build`
-→ snapshot turns the S2 tooling into an actual image.
+**Studio P0 is built and proven (2026-07-01, `HISTORY.md` Act XIX):** the `macbridge` CLI
+is now the self-contained product surface — embedded tooling, `install`, local
+`status`/`doctor`, offline license gate (free/Pro), release workflow + Homebrew formula
+template — and **`macbridge install` reached 🟢 MAC READY on a real Apple-hardware runner**
+under a strict (no error-swallowing) CI gate.
+
+**Distance to first dollar is now operational, not code:**
+1. Create the Homebrew tap repo + cut a `v0.1.0` tag (release workflow does the rest).
+2. LemonSqueezy checkout → deliver an `mbkeygen` key on purchase.
+3. Apple Developer ID signing/notarization for direct downloads (Homebrew works without).
+4. Decide the S7 tier structure; when you have a GUI Mac, `golden-image.sh build` → snapshot.

@@ -233,6 +233,37 @@ The lesson is the sharpest one yet:
 > "runs on my machine" and "runs on the target" can be disjoint —
 > and the silenced error is the one that hides the impossible gate
 
+### 12. Studio P0 — the CLI became the product
+
+The proven toolchain still had a conversion rate of zero, because nobody
+could install it. Studio P0 fixed that:
+
+- the Go binary now embeds the entire shell tooling and extracts it on
+  first use — no git clone, `brew install macbridge` is the whole story
+- `macbridge install` provisions the Mac it runs on; `status` and `doctor`
+  work locally without `--host` (and remotely with it — one CLI, both
+  deployment models)
+- an offline-checkable license gate splits Free from Pro, with a vendor-only
+  key generator that never ships in releases
+- a tag-triggered release workflow and a Homebrew formula template make
+  distribution real
+
+The macOS smoke workflow now exercises the product surface itself, strictly:
+license lifecycle, local doctor, and `macbridge install` with no error
+swallowing. That strictness immediately caught the same SIGPIPE-under-pipefail
+class from chapter 11 still living in the layer scripts — it had passed one
+run and failed the next, because SIGPIPE is a race. A thirty-second grep swept
+the whole class this time.
+
+Second run, fully strict, on real Apple hardware:
+
+> `macbridge install` → 🟢 MAC READY
+
+The rule this chapter earned:
+
+> when you fix a bug class, sweep for the class — not the instance —
+> and make the product surface itself the regression test
+
 ## What Broke, and What It Taught
 
 ### Shell is good at orchestration

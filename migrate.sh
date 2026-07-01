@@ -172,7 +172,7 @@ perform_upgrade() {
     # Backup user configs before touching anything
     step "Backing up user configuration..."
     mkdir -p "$BACKUP_DIR/${current}-backup-$(date +%Y%m%d-%H%M%S)"
-    local backup_path; backup_path=$(ls -td "$BACKUP_DIR"/* | head -1)
+    local backup_path; backup_path=$(ls -td "$BACKUP_DIR"/* | head -1 || true)
 
     cp "$HOME/.zprofile" "$backup_path/.zprofile" 2>/dev/null || true
     cp "$HOME/.ssh/config" "$backup_path/ssh_config" 2>/dev/null || true

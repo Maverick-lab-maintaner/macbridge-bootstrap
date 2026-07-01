@@ -1,0 +1,48 @@
+name: Release
+
+# Studio distribution: on a version tag, build the self-contained macbridge
+# binary (embedded tooling) for macOS arm64/amd64 + a Windows operator build,
+# attach them to a GitHub Release with checksums.
+#
+# NOTE: builds ONLY ./cmd/macbridge — cmd/mbkeygen (the license generator)
+# must never ship in release artifacts.
+#
+# Signing/notarization (Developer ID) is a follow-up: it needs Apple
+# credentials in repo secrets. Until then, Homebrew installs work but direct
+# downloads hit Gatekeeper. See docs/STUDIO_PACKAGING.md.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: go.sum
+
+      - name: Build binaries (embedded tooling)
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          LDFLAGS="-s -w -X github.com/Maverick-lab-maintaner/macbridge-bootstrap/cmd/macbridge/commands.Version=${VERSION}"
+          mkdir -p dist
+          GOOS=darwin  GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/macbridge-${VERSION}-darwin-arm64  ./cmd/macbridge
+          GOOS=darwin  GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/macbridge-${VERSION}-darwin-amd64  ./cmd/macbridge
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/macbridge-${VERSION}-windows-amd64.exe ./cmd/macbridge
+          (cd dist && sha256sum * > checksums.txt && cat checksums.txt)
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "macbridge ${GITHUB_REF_NAME}" \
+            --generate-notes

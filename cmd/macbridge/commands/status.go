@@ -150,16 +150,27 @@ func printItem(enabled bool, label, value, state string) {
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check Mac environment health",
+	Short: "Check Mac environment health (this Mac, or --host for a remote one)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := hostRequired(); err != nil {
-			return err
-		}
-
-		raw, err := runSSHOutput(
-			"cd ~/macbridge-bootstrap && bash verify.sh --json --quick",
-			"-o", "ConnectTimeout=10",
+		var (
+			raw  []byte
+			err  error
+			host = macHost
 		)
+
+		if macHost == "" {
+			// Studio local mode: verify the Mac this command runs on.
+			if err := requireDarwin("macbridge status (local)"); err != nil {
+				return err
+			}
+			raw, err = runLocalScriptOutput("verify.sh", "--json", "--quick")
+			host = "local"
+		} else {
+			raw, err = runSSHOutput(
+				"cd ~/macbridge-bootstrap && bash verify.sh --json --quick",
+				"-o", "ConnectTimeout=10",
+			)
+		}
 		if err != nil && len(raw) == 0 {
 			return fmt.Errorf("status check failed: %w", err)
 		}
@@ -169,7 +180,7 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("invalid status JSON: %w", err)
 		}
 
-		renderTUI(report, macHost)
+		renderTUI(report, host)
 		return nil
 	},
 }
@@ -244,11 +255,35 @@ var (
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
-	Short: "Run remote remediation guidance (environment, or --signing for code signing)",
+	Short: "Diagnose this Mac (or --host for a remote one); --signing for code signing",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := hostRequired(); err != nil {
-			return err
+		if macHost == "" {
+			// Studio local mode: run the diagnosers on this Mac.
+			if err := requireDarwin("macbridge doctor (local)"); err != nil {
+				return err
+			}
+			if doctorSigning {
+				// Pro gate applies to the local Studio surface only; the
+				// remote path stays open for Managed/operator use.
+				if err := requirePro("Signing diagnosis"); err != nil {
+					return err
+				}
+				sigArgs := []string{}
+				if doctorProject != "" {
+					sigArgs = append(sigArgs, "--project", doctorProject)
+				}
+				if doctorJSON {
+					sigArgs = append(sigArgs, "--json")
+				}
+				return runLocalScript("signing-doctor.sh", sigArgs...)
+			}
+			docArgs := []string{"--quick"}
+			if doctorJSON {
+				docArgs = append(docArgs, "--json")
+			}
+			return runLocalScript("doctor.sh", docArgs...)
 		}
+
 		return runSSHCommand(
 			buildDoctorCommand(),
 			false,

@@ -70,11 +70,24 @@ CocoaPods conflict is solved.
 
 ## Phased build plan
 
-**P0 — Ship Studio to beta**
-1. Package the `macbridge` CLI over the current tooling; add `install`.
-2. A simple license gate (key check, offline grace).
-3. Homebrew tap + a signed/notarized binary.
-4. A clean **BYO-onboarding** flow: "connect your Mac (cloud or your own) → `macbridge install` → ready." This is where Studio conversion is won.
+**P0 — Ship Studio to beta** *(status as of 2026-07-01)*
+1. ~~Package the `macbridge` CLI over the current tooling; add `install`.~~ **Done** — the
+   binary embeds the full tooling tree (`tooling.go`, Go `embed`) and extracts to
+   `~/.macbridge/tooling` on first use; `macbridge install` runs the layered bootstrap
+   locally; `status`/`doctor` run locally when no `--host` is given (remote mode unchanged).
+2. ~~A simple license gate (key check, offline grace).~~ **Done** — `internal/license`:
+   `MB-XXXX-XXXX-XXXX-CCCC` keys (FNV-1a checksum group, ambiguity-free alphabet), offline
+   validation, `~/.macbridge/license.json` record, 30-day grace, free/Pro split
+   (`macbridge activate` / `macbridge license`; signing diagnosis is the first Pro-gated
+   surface, local mode only). Vendor keygen: `go run ./cmd/mbkeygen` — **never shipped in
+   releases**. Server-side entitlement attaches at P1 with the updates channel.
+3. Homebrew tap + a signed/notarized binary. **Half done** — release workflow
+   (`.github/workflows/release.yml`, tag-triggered, builds darwin arm64/amd64 + windows,
+   checksums, GitHub Release; builds *only* `./cmd/macbridge`) and the formula template
+   (`dist/homebrew/macbridge.rb`). **Still needed:** create the tap repo, and Developer ID
+   signing + notarization (needs Apple credentials in secrets).
+4. A clean **BYO-onboarding** flow: "connect your Mac (cloud or your own) → `macbridge
+   install` → ready." **Open** — the CLI mechanics exist; the guided flow/docs are next.
 
 **P1 — Make the subscription recur**
 5. `macbridge update` → signed knowledge bundle, entitlement-gated.
